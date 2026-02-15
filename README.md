@@ -24,7 +24,7 @@ anvil
 Terminal 2:
 ```bash
 export PRIVATE_KEY=0xYOUR_ANVIL_KEY
-export WORKFLOW_OPERATOR=0xCRE_SIGNER_ADDRESS   # optional; defaults to deployer
+export CRE_REPORT_FORWARDER=0x0000000000000000000000000000000000000000 # optional; 0 allows direct calls
 forge script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadcast
 ```
 
@@ -37,6 +37,29 @@ export APPROVED=true
 export RISK_SCORE=42
 export ATTESTATION_HASH=0x0000000000000000000000000000000000000000000000000000000000000000
 forge script script/Configure.s.sol:Configure --rpc-url http://127.0.0.1:8545 --broadcast
+```
+
+## Mock KYB provider + real Gemini (dev runner)
+Until you pick a real KYB/KYC provider, there’s a minimal local HTTP service and a runner script that:
+1) reads a diligence request from `DiligencePortal`
+2) calls the KYB stub (`tools/kyb-stub/server.mjs`)
+3) calls Gemini for risk JSON
+4) writes the decision to `RWAComplianceReceiver.onReport(...)` (which updates `ComplianceRegistry`)
+
+Terminal 1:
+```bash
+node tools/kyb-stub/server.mjs
+```
+
+Terminal 2 (example):
+```bash
+export RPC_URL=http://127.0.0.1:8545
+export PRIVATE_KEY=0xYOUR_ANVIL_KEY
+export PORTAL_ADDRESS=0x...
+export RECEIVER_ADDRESS=0x...
+export REQUEST_ID=1
+export GEMINI_API_KEY=...
+node tools/process-request.mjs
 ```
 
 ## EAS (optional audit trail)
