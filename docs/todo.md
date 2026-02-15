@@ -19,6 +19,10 @@ This is the tracked to-do list for hackathon readiness (what still needs doing b
 - Decide buyer strategy:
   - If CRE supports x402 buyer payments, wire it into `my-workflow/main.ts`.
   - Otherwise, add a small paid-call client (Node script) for demo purposes.
+ - Record a paid-call proof:
+   - 402 response includes `accepts[]`
+   - client retries with `X-PAYMENT`
+   - server returns `X-PAYMENT-RESPONSE`
 
 ## Agents (ERC-8004)
 - Decide the “diligence agent” identity:
@@ -32,4 +36,3 @@ This is the tracked to-do list for hackathon readiness (what still needs doing b
 - Pin `RWAComplianceReceiver` expected workflow identity fields once the workflow is deployed.
 - Replace deterministic KYB logic with a real provider integration (Sumsub/Persona/Onfido/etc.).
 - Add a simple frontend (issuer submit + status page) if time permits.
-

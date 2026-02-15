@@ -75,7 +75,7 @@ node tools/process-request.mjs
 
 Notes:
 - CRE workflow configs default `kybUrl` to `http://127.0.0.1:3001/kyb/free`.
-- To enable x402 on `POST /kyb`, set `X402_ENABLED=true` in `services/kyb-provider/.env` (see `.env.example`).
+- To enable x402 on `POST /kyb`, set `X402_ENABLED=true` and `X402_PAY_TO=<your wallet address>` in `services/kyb-provider/.env` (see `.env.example`). Clients pay by sending an `X-PAYMENT` header; the server responds with `X-PAYMENT-RESPONSE` on success.
 
 ## EAS (optional audit trail)
 Register a schema (once) and create an attestation for a diligence decision.

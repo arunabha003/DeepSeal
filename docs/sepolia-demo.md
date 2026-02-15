@@ -47,6 +47,8 @@ Preferred (x402-ready provider; use the free route for CRE simulation):
 ```bash
 cd services/kyb-provider
 npm install
+# optional: enable x402 paywall on POST /kyb
+# cp .env.example .env && edit X402_ENABLED=true and X402_PAY_TO=<your wallet>
 npm run dev
 ```
 

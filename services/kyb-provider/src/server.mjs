@@ -4,31 +4,52 @@ import express from 'express'
 
 dotenv.config({ path: new URL('../.env', import.meta.url) })
 
-let paymentMiddleware
-try {
-  // eslint-disable-next-line import/no-extraneous-dependencies
-  ;({ paymentMiddleware } = await import('x402'))
-} catch {
-  paymentMiddleware = null
-}
+import { decodePayment } from 'x402/schemes'
+import { getDefaultAsset, processPriceToAtomicAmount } from 'x402/shared'
+import { settleResponseHeader } from 'x402/types'
+import { settle, verify } from 'x402/verify'
 
 const app = express()
 app.use(express.json({ limit: '2mb' }))
 
 const port = Number(process.env.PORT || 3001)
 const x402Enabled = String(process.env.X402_ENABLED || 'false').toLowerCase() === 'true'
+const x402Version = Number(process.env.X402_VERSION || 1)
 
-if (x402Enabled) {
-  if (!paymentMiddleware) {
-    throw new Error(
-      'X402_ENABLED=true but `x402` could not be imported. Run `npm install` in services/kyb-provider.',
-    )
-  }
-  app.use(
-    paymentMiddleware({
-      'POST /kyb': { accepts: ['USDC'], price: process.env.KYB_PRICE || '0.01' },
-    }),
-  )
+const mustEnv = (name) => {
+  const v = process.env[name]
+  if (!v) throw new Error(`Missing required env var: ${name}`)
+  return v
+}
+
+const toPaymentRequirements = (req) => {
+  const payTo = mustEnv('X402_PAY_TO')
+  const network = String(process.env.X402_NETWORK || 'base-sepolia')
+  const price = process.env.KYB_PRICE || '0.01'
+  const timeout = Number(process.env.X402_TIMEOUT_SECONDS || 120)
+
+  const origin = `${req.protocol}://${req.get('host')}`
+  const resource = `${origin}/kyb`
+
+  const { maxAmountRequired, asset, error } = processPriceToAtomicAmount(price, network)
+  if (error) throw new Error(error)
+
+  const defaultAsset = getDefaultAsset(network)
+
+  return [
+    {
+      scheme: 'exact',
+      network,
+      maxAmountRequired,
+      resource,
+      description: 'KYB verification (mock logic, real x402 payment rail)',
+      mimeType: 'application/json',
+      payTo,
+      maxTimeoutSeconds: timeout,
+      asset: asset?.address || defaultAsset.address,
+      extra: asset?.eip712 || defaultAsset.eip712,
+    },
+  ]
 }
 
 app.get('/healthz', (_req, res) => res.status(200).json({ ok: true, x402Enabled }))
@@ -52,8 +73,52 @@ app.post('/kyb/free', (req, res) => {
 })
 
 // Paywalled path when X402_ENABLED=true.
-app.post('/kyb', (req, res) => {
-  res.status(200).json(compute(req.body))
+app.post('/kyb', async (req, res) => {
+  if (!x402Enabled) {
+    return res.status(200).json(compute(req.body))
+  }
+
+  const accepts = toPaymentRequirements(req)
+  const paymentHeader = req.header('X-PAYMENT')
+
+  if (!paymentHeader) {
+    return res.status(402).json({ x402Version, accepts })
+  }
+
+  try {
+    const payload = decodePayment(paymentHeader)
+    const paymentRequirements = accepts[0]
+
+    const verifyResp = await verify(payload, paymentRequirements)
+    if (!verifyResp?.isValid) {
+      return res.status(402).json({
+        x402Version,
+        accepts,
+        error: verifyResp?.invalidReason || 'unexpected_verify_error',
+        payer: verifyResp?.payer,
+      })
+    }
+
+    const settleResp = await settle(payload, paymentRequirements)
+    if (!settleResp?.success) {
+      return res.status(402).json({
+        x402Version,
+        accepts,
+        error: settleResp?.errorReason || 'unexpected_settle_error',
+        payer: settleResp?.payer,
+      })
+    }
+
+    res.setHeader('X-PAYMENT-RESPONSE', settleResponseHeader(settleResp))
+    return res.status(200).json(compute(req.body))
+  } catch (e) {
+    return res.status(402).json({
+      x402Version,
+      accepts,
+      error: 'unexpected_verify_error',
+      detail: String(e?.message || e),
+    })
+  }
 })
 
 app.listen(port, () => {
