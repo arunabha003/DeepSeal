@@ -31,7 +31,7 @@ npm run dev
 ## 5) Simulate
 From `cre/chainlink-Convergence`:
 ```bash
-cre workflow simulate ./my-workflow --trigger-index 0 --http-payload @../http-payload.json
+cre workflow simulate ./my-workflow --trigger-index 0 --http-payload ../http-payload.json
 ```
 
 Example `../http-payload.json`:

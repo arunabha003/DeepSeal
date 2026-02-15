@@ -76,8 +76,10 @@ cat > http-payload.local.json <<EOF
 { "requestId": $REQUEST_ID }
 EOF
 
-cre workflow simulate ./my-workflow --trigger-index 0 --http-payload @./http-payload.local.json --broadcast -e .env
+cre workflow simulate ./my-workflow --trigger-index 0 --http-payload ./http-payload.local.json --broadcast -e .env
 ```
+
+If your `cre` CLI prompts interactively for the HTTP trigger input, paste JSON directly (e.g. `{"requestId": 1}`) or enter the file path `./http-payload.local.json`.
 
 ## 6) Verify onchain state + vault gate
 Read approval status:
