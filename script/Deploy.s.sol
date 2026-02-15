@@ -6,6 +6,7 @@ import {console2} from "forge-std/console2.sol";
 
 import {DemoUSD} from "../src/DemoUSD.sol";
 import {ComplianceRegistry} from "../src/ComplianceRegistry.sol";
+import {DiligencePortal} from "../src/DiligencePortal.sol";
 import {RWAComplianceReceiver} from "../src/RWAComplianceReceiver.sol";
 import {RWAVault} from "../src/RWAVault.sol";
 
@@ -28,6 +29,7 @@ contract Deploy is Script {
         );
         registry.setWorkflowOperator(address(receiver));
         RWAVault vault = new RWAVault(asset, registry, "RWA Vault Share", "RWAV");
+        DiligencePortal portal = new DiligencePortal();
 
         // Optional: seed deployer with demo funds for local testing
         uint256 seedAmount = vm.envOr("SEED_AMOUNT", uint256(1_000_000e6));
@@ -44,5 +46,6 @@ contract Deploy is Script {
         console2.log("ComplianceRegistry:", address(registry));
         console2.log("RWAComplianceReceiver:", address(receiver));
         console2.log("RWAVault:", address(vault));
+        console2.log("DiligencePortal:", address(portal));
     }
 }
