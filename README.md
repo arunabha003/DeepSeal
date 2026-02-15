@@ -83,3 +83,13 @@ export RISK_SCORE=42
 export ATTESTATION_HASH=0x...
 forge script script/EASAttest.s.sol:EASAttest --rpc-url <RPC> --broadcast
 ```
+
+## CRE receiver configuration (optional hardening)
+`RWAComplianceReceiver` can restrict who can call `onReport` and optionally validate workflow identity fields.
+
+- Allow only a specific forwarder:
+  - Deploy with `CRE_REPORT_FORWARDER=<address>` (or set later via `setForwarder(address)` as the owner)
+- Optionally pin expected workflow identity (set on deploy or later via `setExpectedWorkflow(bytes32,address,bytes10)`):
+  - `CRE_WORKFLOW_ID` (bytes32)
+  - `CRE_WORKFLOW_AUTHOR` (address)
+  - `CRE_WORKFLOW_NAME` (bytes10)
