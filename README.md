@@ -38,7 +38,3 @@ export RISK_SCORE=42
 export ATTESTATION_HASH=0x0000000000000000000000000000000000000000000000000000000000000000
 forge script script/Configure.s.sol:Configure --rpc-url http://127.0.0.1:8545 --broadcast
 ```
-
-## Status
-See `STATUS.md`.
-

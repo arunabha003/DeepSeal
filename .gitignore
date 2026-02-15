@@ -4,4 +4,6 @@
 /lib/**/.git
 .DS_Store
 .env
-
+plan.md
+STATUS.md
+STATUS.d
