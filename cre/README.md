@@ -36,6 +36,11 @@ The workflow should write to the deployed `RWAComplianceReceiver`:
   - Can be `0x` for simulation while `RWAComplianceReceiver.forwarder == 0` and workflow identity checks are disabled
   - Later: set receiver `forwarder` + expected workflow identity to lock it down
 
+ABIs are exported for convenience:
+- `cre/abi/RWAComplianceReceiver.json`
+- `cre/abi/DiligencePortal.json`
+- `cre/abi/ComplianceRegistry.json`
+
 ### D) Trigger options
 Pick one (both are compatible with the onchain design):
 - **HTTP trigger**: easiest to demo; POST `{ subject, docBundleHash, metadataUri }`
