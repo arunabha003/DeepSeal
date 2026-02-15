@@ -21,6 +21,8 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
   - helper scripts in `script/*Validation*.s.sol`, `script/AgentRegister.s.sol`, `script/GiveFeedback.s.sol`
 - x402-ready KYB provider (seller/paywall) with free route for CRE simulation:
   - `services/kyb-provider/src/server.mjs`
+- Automated EAS attestations (optional) on each report:
+  - `src/RWAComplianceReceiver.sol` (configurable via `setEAS(...)`, wired in `script/Deploy.s.sol`)
 - CRE project scaffold + workflow:
   - `cre/chainlink-Convergence/my-workflow/main.ts` (HTTP trigger)
   - `cre/abi/*.json` (ABIs exported for integration)
@@ -30,7 +32,7 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
   - `cre/chainlink-Convergence/my-workflow/config.staging.json`
 - Run and record the full demo:
   - submit request → simulate workflow → registry updated → vault deposit succeeds
-- Optional: enable x402 on the KYB provider and add a paid-call demo (buyer wallet + USDC)
+- Optional: enable x402 on the KYB provider and add a paid-call demo (buyer wallet + USDC) or enable `x402Enabled=true` in the CRE workflow config.
 - Replace KYB stub/provider logic with a real KYB/KYC provider (later)
 
 ## Known issues / fixes

@@ -13,6 +13,9 @@ This is the tracked to-do list for hackathon readiness (what still needs doing b
   - CRE `workflow simulate` output + `writeReport` tx hash
   - `ComplianceRegistry.isApproved(subject)` changes from false → true
   - vault `deposit` revert before approval and success after approval
+ - (Optional) EAS automation demo:
+   - deploy receiver with `EAS_ATTESTATION_CONTRACT` + `EAS_SCHEMA_UID`
+   - capture `EASAttested(subject, uid)` event from the `RWAComplianceReceiver` tx
 
 ## Payments (x402)
 - Enable x402 on the KYB provider (`services/kyb-provider/.env`: `X402_ENABLED=true`) and verify `POST /kyb` returns 402 until paid.
@@ -20,9 +23,13 @@ This is the tracked to-do list for hackathon readiness (what still needs doing b
   - If CRE supports x402 buyer payments, wire it into `my-workflow/main.ts`.
   - Otherwise, add a small paid-call client (Node script) for demo purposes.
  - Record a paid-call proof:
-   - 402 response includes `accepts[]`
-   - client retries with `X-PAYMENT`
-   - server returns `X-PAYMENT-RESPONSE`
+  - 402 response includes `accepts[]`
+  - client retries with `X-PAYMENT`
+  - server returns `X-PAYMENT-RESPONSE`
+
+## Privacy (Confidential HTTP)
+- Switch the workflow to use Confidential HTTP (`useConfidentialHttp=true`) once your CRE environment supports it for the target.
+- Confirm the workflow still produces the same result while keeping KYB payloads off the public runner.
 
 ## Agents (ERC-8004)
 - Decide the “diligence agent” identity:

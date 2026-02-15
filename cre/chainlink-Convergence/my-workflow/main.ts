@@ -1,6 +1,7 @@
 import {
 	bytesToHex,
 	ConsensusAggregationByFields,
+	ConfidentialHTTPClient,
 	handler,
 	EVMClient,
 	HTTPClient,
@@ -8,6 +9,7 @@ import {
 	encodeCallMsg,
 	getNetwork,
 	type HTTPSendRequester,
+	type ConfidentialHTTPSendRequester,
 	hexToBase64,
 	LAST_FINALIZED_BLOCK_NUMBER,
 	Runner,
@@ -15,20 +17,22 @@ import {
 	TxStatus,
 	identical,
 	median,
-	ok,
-	text,
 } from '@chainlink/cre-sdk'
 import {
 	type Address,
 	decodeFunctionResult,
 	encodeAbiParameters,
 	encodeFunctionData,
+	hashTypedData,
+	hexToBytes,
 	keccak256,
 	parseAbiParameters,
 	concatHex,
 	toHex,
 	zeroAddress,
 } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
+import { secp256k1 } from '@noble/curves/secp256k1'
 import { z } from 'zod'
 import { DiligencePortal } from '../contracts/abi/DiligencePortal'
 
@@ -39,6 +43,8 @@ const configSchema = z.object({
 	gasLimit: z.string(),
 	kybUrl: z.string(),
 	geminiModel: z.string(),
+	useConfidentialHttp: z.boolean().optional(),
+	x402Enabled: z.boolean().optional(),
 })
 
 type Config = z.infer<typeof configSchema>
@@ -59,6 +65,7 @@ type KYBResult = {
 	providerStatus: 'APPROVED' | 'REJECTED'
 	providerScore: number
 	providerResponseHash: `0x${string}`
+	xPaymentResponseHeader?: string
 }
 
 type RiskJson = {
@@ -73,17 +80,143 @@ type RiskObservation = {
 	reasonsText: string
 }
 
-const fetchKyb = (sendRequester: HTTPSendRequester, config: Config, req: DiligenceRequest): KYBResult => {
-	const bodyBytes = new TextEncoder().encode(
-		JSON.stringify({
-			subject: req.subject,
-			docBundleHash: req.docBundleHash,
-			metadataUri: req.metadataUri,
-		}),
-	)
-	const body = Buffer.from(bodyBytes).toString('base64')
+const decodeBodyUtf8 = (body: Uint8Array): string => Buffer.from(body).toString('utf-8')
 
-	const response = sendRequester
+const safeJsonParse = (s: string): any => {
+	try {
+		return JSON.parse(s)
+	} catch (e: any) {
+		throw new Error(`Failed to parse JSON: ${e?.message || e}. Raw=${s}`)
+	}
+}
+
+type X402Accept = {
+	scheme: 'exact'
+	network: string
+	maxAmountRequired: string
+	resource: string
+	payTo: string
+	asset: string
+	extra?: { name?: string; version?: string }
+	maxTimeoutSeconds: number
+}
+
+const x402ResponseSchema = z.object({
+	x402Version: z.number().optional(),
+	accepts: z.array(
+		z.object({
+			scheme: z.literal('exact'),
+			network: z.string(),
+			maxAmountRequired: z.string(),
+			resource: z.string().optional(),
+			payTo: z.string(),
+			asset: z.string(),
+			extra: z.record(z.any()).optional(),
+			maxTimeoutSeconds: z.number().int().positive().optional(),
+		}),
+	),
+})
+
+const networkToChainId = (network: string): number => {
+	switch (network) {
+		case 'base-sepolia':
+			return 84532
+		case 'base':
+			return 8453
+		case 'avalanche-fuji':
+			return 43113
+		case 'avalanche':
+			return 43114
+		case 'polygon-amoy':
+			return 80002
+		case 'polygon':
+			return 137
+		default:
+			throw new Error(`Unsupported x402 network for buyer flow: ${network}`)
+	}
+}
+
+const buildXPaymentHeaderExactEvm = (accept: X402Accept, buyerPrivateKey: `0x${string}`, nonceSeed: string): string => {
+	const account = privateKeyToAccount(buyerPrivateKey)
+	const from = account.address
+	const to = accept.payTo as Address
+	const value = BigInt(accept.maxAmountRequired)
+	const now = BigInt(Math.floor(Date.now() / 1000))
+	const validAfter = now > 10n ? now - 10n : 0n
+	const timeout = BigInt(accept.maxTimeoutSeconds || 120)
+	const validBefore = now + timeout
+	const nonce = keccak256(toHex(`${nonceSeed}:${Date.now().toString()}`))
+
+	const chainId = networkToChainId(accept.network)
+	const domain = {
+		name: (accept.extra?.name as string) || 'USD Coin',
+		version: (accept.extra?.version as string) || '2',
+		chainId,
+		verifyingContract: accept.asset as Address,
+	} as const
+
+	const types = {
+		TransferWithAuthorization: [
+			{ name: 'from', type: 'address' },
+			{ name: 'to', type: 'address' },
+			{ name: 'value', type: 'uint256' },
+			{ name: 'validAfter', type: 'uint256' },
+			{ name: 'validBefore', type: 'uint256' },
+			{ name: 'nonce', type: 'bytes32' },
+		],
+	} as const
+
+	const message = {
+		from,
+		to,
+		value,
+		validAfter,
+		validBefore,
+		nonce,
+	} as const
+
+	const digest = hashTypedData({
+		domain,
+		types,
+		primaryType: 'TransferWithAuthorization',
+		message,
+	})
+	const sig = secp256k1.sign(hexToBytes(digest), hexToBytes(buyerPrivateKey))
+	const v = (sig.recovery ?? 0) + 27
+	const signature = (`0x${sig.toCompactHex()}${v.toString(16).padStart(2, '0')}`) as `0x${string}`
+
+	const payload = {
+		x402Version: 1,
+		scheme: 'exact',
+		network: accept.network,
+		payload: {
+			signature,
+			authorization: {
+				from,
+				to,
+				value: value.toString(),
+				validAfter: validAfter.toString(),
+				validBefore: validBefore.toString(),
+				nonce,
+			},
+		},
+	}
+
+	return Buffer.from(JSON.stringify(payload)).toString('base64')
+}
+
+const fetchKybHttp = (sendRequester: HTTPSendRequester, config: Config, req: DiligenceRequest, runtime: Runtime<Config>): KYBResult => {
+	const body = Buffer.from(
+		new TextEncoder().encode(
+			JSON.stringify({
+				subject: req.subject,
+				docBundleHash: req.docBundleHash,
+				metadataUri: req.metadataUri,
+			}),
+		),
+	).toString('base64')
+
+	const initial = sendRequester
 		.sendRequest({
 			method: 'POST',
 			url: config.kybUrl,
@@ -92,11 +225,94 @@ const fetchKyb = (sendRequester: HTTPSendRequester, config: Config, req: Diligen
 		})
 		.result()
 
-	if (!ok(response)) {
-		throw new Error(`KYB HTTP request failed with status: ${response.statusCode} body=${text(response)}`)
+	// x402 buyer flow (optional): if paywalled, retry with X-PAYMENT
+	if (initial.statusCode === 402 && Boolean(config.x402Enabled)) {
+		const secret = runtime.getSecret({ id: 'X402_BUYER_PRIVATE_KEY' }).result()
+		const buyerPk = secret.value as `0x${string}`
+		if (!buyerPk) throw new Error('Missing secret: X402_BUYER_PRIVATE_KEY')
+
+		const parsed402 = x402ResponseSchema.parse(safeJsonParse(decodeBodyUtf8(initial.body)))
+		const accept0 = parsed402.accepts[0] as any
+		const accept: X402Accept = {
+			scheme: 'exact',
+			network: accept0.network,
+			maxAmountRequired: accept0.maxAmountRequired,
+			resource: accept0.resource || config.kybUrl,
+			payTo: accept0.payTo,
+			asset: accept0.asset,
+			extra: (accept0.extra as any) || {},
+			maxTimeoutSeconds: accept0.maxTimeoutSeconds || 120,
+		}
+
+		const xPayment = buildXPaymentHeaderExactEvm(accept, buyerPk, `kyb:${req.subject}:${req.docBundleHash}`)
+
+		const paid = sendRequester
+			.sendRequest({
+				method: 'POST',
+				url: config.kybUrl.replace(/\/kyb\/free$/, '/kyb'),
+				headers: { 'content-type': 'application/json', 'X-PAYMENT': xPayment },
+				body,
+			})
+			.result()
+
+		if (paid.statusCode < 200 || paid.statusCode >= 300) {
+			throw new Error(`KYB x402-paid request failed with status: ${paid.statusCode} body=${decodeBodyUtf8(paid.body)}`)
+		}
+
+		const parsed = safeJsonParse(decodeBodyUtf8(paid.body))
+		return {
+			providerStatus: parsed.providerStatus,
+			providerScore: parsed.providerScore,
+			providerResponseHash: parsed.providerResponseHash,
+			xPaymentResponseHeader: paid.headers?.['X-PAYMENT-RESPONSE'] || paid.headers?.['x-payment-response'],
+		} as KYBResult
 	}
 
-	const parsed = JSON.parse(text(response)) as any
+	if (initial.statusCode < 200 || initial.statusCode >= 300) {
+		throw new Error(`KYB HTTP request failed with status: ${initial.statusCode} body=${decodeBodyUtf8(initial.body)}`)
+	}
+
+	const parsed = safeJsonParse(decodeBodyUtf8(initial.body))
+	return {
+		providerStatus: parsed.providerStatus,
+		providerScore: parsed.providerScore,
+		providerResponseHash: parsed.providerResponseHash,
+	} as KYBResult
+}
+
+const fetchKybConfidential = (
+	sendRequester: ConfidentialHTTPSendRequester,
+	config: Config,
+	req: DiligenceRequest,
+	runtime: Runtime<Config>,
+): KYBResult => {
+	const bodyString = JSON.stringify({
+		subject: req.subject,
+		docBundleHash: req.docBundleHash,
+		metadataUri: req.metadataUri,
+	})
+
+	const initial = sendRequester
+		.sendRequest({
+			vaultDonSecrets: [],
+			encryptOutput: false,
+			request: {
+				method: 'POST',
+				url: config.kybUrl,
+				bodyString,
+				multiHeaders: { 'content-type': { values: ['application/json'] } },
+			},
+		})
+		.result()
+
+	// x402 buyer flow is only implemented for standard HTTP for now (header encoding + retry).
+	if (initial.statusCode < 200 || initial.statusCode >= 300) {
+		throw new Error(
+			`KYB Confidential HTTP request failed with status: ${initial.statusCode} body=${decodeBodyUtf8(initial.body)}`,
+		)
+	}
+
+	const parsed = safeJsonParse(decodeBodyUtf8(initial.body))
 	return {
 		providerStatus: parsed.providerStatus,
 		providerScore: parsed.providerScore,
@@ -130,11 +346,11 @@ const fetchGeminiRisk = (
 		})
 		.result()
 
-	if (!ok(response)) {
-		throw new Error(`Gemini HTTP request failed with status: ${response.statusCode} body=${text(response)}`)
+	if (response.statusCode < 200 || response.statusCode >= 300) {
+		throw new Error(`Gemini HTTP request failed with status: ${response.statusCode} body=${decodeBodyUtf8(response.body)}`)
 	}
 
-	const jsonResp = JSON.parse(text(response)) as any
+	const jsonResp = safeJsonParse(decodeBodyUtf8(response.body)) as any
 	const outText =
 		(jsonResp?.candidates?.[0]?.content?.parts ?? [])
 			.map((p: any) => (typeof p?.text === 'string' ? p.text : ''))
@@ -253,18 +469,30 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 	const req = readRequestFromPortal(runtime, requestId)
 	runtime.log(`subject=${req.subject} docBundleHash=${req.docBundleHash} metadataUri=${req.metadataUri}`)
 
-	const http = new HTTPClient()
-	const kyb = http
-		.sendRequest(
-			runtime,
-			(sr: HTTPSendRequester, cfg: Config) => fetchKyb(sr, cfg, req),
-			ConsensusAggregationByFields<KYBResult>({
-				providerStatus: identical,
-				providerScore: median,
-				providerResponseHash: identical,
-			}),
-		)(runtime.config)
-		.result()
+	const useConf = Boolean(runtime.config.useConfidentialHttp)
+	const kyb = useConf
+		? new ConfidentialHTTPClient()
+				.sendRequest(
+					runtime,
+					(sr: ConfidentialHTTPSendRequester, cfg: Config) => fetchKybConfidential(sr, cfg, req, runtime),
+					ConsensusAggregationByFields<KYBResult>({
+						providerStatus: identical,
+						providerScore: median,
+						providerResponseHash: identical,
+					}),
+				)(runtime.config)
+				.result()
+		: new HTTPClient()
+				.sendRequest(
+					runtime,
+					(sr: HTTPSendRequester, cfg: Config) => fetchKybHttp(sr, cfg, req, runtime),
+					ConsensusAggregationByFields<KYBResult>({
+						providerStatus: identical,
+						providerScore: median,
+						providerResponseHash: identical,
+					}),
+				)(runtime.config)
+				.result()
 	runtime.log(`KYB providerStatus=${kyb.providerStatus} providerScore=${kyb.providerScore}`)
 
 	const prompt = [
@@ -290,7 +518,7 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 	const apiKey = secret.value
 	if (!apiKey) throw new Error('Missing secret: GEMINI_API_KEY')
 
-	const geminiRisk = http
+	const geminiRisk = new HTTPClient()
 		.sendRequest(
 			runtime,
 			(sr: HTTPSendRequester, cfg: Config) => fetchGeminiRisk(sr, cfg, apiKey, prompt),

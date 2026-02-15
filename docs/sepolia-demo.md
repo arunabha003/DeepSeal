@@ -63,10 +63,14 @@ Edit:
   - `diligencePortalAddress`
   - `receiverAddress`
   - `kybUrl` (defaults to `http://127.0.0.1:3001/kyb/free`)
+  - Optional:
+    - `useConfidentialHttp` (set true only if your CRE environment supports Confidential HTTP)
+    - `x402Enabled` (set true if using the paywalled `POST /kyb` route and you’ve set `X402_BUYER_PRIVATE_KEY`)
 
 Create `cre/chainlink-Convergence/.env` from `cre/chainlink-Convergence/.env.example`:
 - `CRE_ETH_PRIVATE_KEY` (same key as above)
 - `GEMINI_API_KEY`
+ - Optional: `X402_BUYER_PRIVATE_KEY`
 
 ## 5) Simulate workflow (HTTP trigger) and broadcast
 From `cre/chainlink-Convergence`:

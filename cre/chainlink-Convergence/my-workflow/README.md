@@ -19,6 +19,9 @@ Edit `config.staging.json`:
 - `diligencePortalAddress` (deployed `DiligencePortal`)
 - `receiverAddress` (deployed `RWAComplianceReceiver`)
 - `kybUrl` (local provider free route: `http://127.0.0.1:3001/kyb/free`)
+ - Optional:
+   - `useConfidentialHttp` (explicit Confidential HTTP client)
+   - `x402Enabled` (if KYB is paywalled on `POST /kyb`)
 
 ## 4) Run KYB provider (local)
 In repo root:
