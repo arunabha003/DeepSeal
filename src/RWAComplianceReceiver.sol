@@ -5,6 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {ComplianceRegistry} from "./ComplianceRegistry.sol";
+import {IEAS} from "./interfaces/IEAS.sol";
 
 interface IReceiver is IERC165 {
     function onReport(bytes calldata metadata, bytes calldata report) external;
@@ -20,6 +21,11 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
     /// @dev Keystone Forwarder address. If set to `address(0)`, anyone may call `onReport` (useful for local testing).
     address public forwarder;
 
+    /// @dev Optional: automated EAS attestations for each processed report.
+    IEAS public eas;
+    bytes32 public easSchemaUid;
+    bool public easRevocable;
+
     bytes32 public expectedWorkflowId; // optional (0 disables check)
     address public expectedAuthor; // optional (0 disables check)
     bytes10 public expectedWorkflowName; // optional (0 disables check)
@@ -27,6 +33,9 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
     event ForwarderUpdated(address indexed previousForwarder, address indexed newForwarder);
     event WorkflowIdentityUpdated(bytes32 workflowId, address author, bytes10 workflowName);
     event ReportProcessed(address indexed subject, bool approved, uint32 riskScore, bytes32 attestationHash);
+    event EASConfigUpdated(address indexed eas, bytes32 indexed schemaUid, bool revocable);
+    event EASAttested(address indexed subject, bytes32 indexed uid);
+    event EASAttestFailed(address indexed subject, bytes reason);
 
     error InvalidForwarder(address caller);
     error InvalidWorkflowId(bytes32 received, bytes32 expected);
@@ -50,6 +59,7 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
         expectedWorkflowId = initialExpectedWorkflowId;
         expectedAuthor = initialExpectedAuthor;
         expectedWorkflowName = initialExpectedWorkflowName;
+        easRevocable = true;
     }
 
     function setForwarder(address newForwarder) external onlyOwner {
@@ -63,6 +73,16 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
         expectedAuthor = author;
         expectedWorkflowName = workflowName;
         emit WorkflowIdentityUpdated(workflowId, author, workflowName);
+    }
+
+    /// @notice Configure automated EAS attestations. Set `eas_` and `schemaUid_` to non-zero to enable.
+    /// @dev Schema MUST match the encoding in `_buildEASData(...)`:
+    /// `address subject,bool approved,uint32 riskScore,bytes32 attestationHash,uint64 timestamp`.
+    function setEAS(address eas_, bytes32 schemaUid_, bool revocable_) external onlyOwner {
+        eas = IEAS(eas_);
+        easSchemaUid = schemaUid_;
+        easRevocable = revocable_;
+        emit EASConfigUpdated(eas_, schemaUid_, revocable_);
     }
 
     /// @notice Called by Keystone Forwarder with the DON-verified report.
@@ -88,6 +108,36 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
 
         complianceRegistry.setApproval(subject, approved, riskScore, attestationHash);
         emit ReportProcessed(subject, approved, riskScore, attestationHash);
+
+        IEAS eas_ = eas;
+        bytes32 schema = easSchemaUid;
+        if (address(eas_) != address(0) && schema != bytes32(0)) {
+            IEAS.AttestationRequest memory req = IEAS.AttestationRequest({
+                schema: schema,
+                data: IEAS.AttestationRequestData({
+                    recipient: subject,
+                    expirationTime: 0,
+                    revocable: easRevocable,
+                    refUID: bytes32(0),
+                    data: _buildEASData(subject, approved, riskScore, attestationHash),
+                    value: 0
+                })
+            });
+
+            try eas_.attest(req) returns (bytes32 uid) {
+                emit EASAttested(subject, uid);
+            } catch (bytes memory reason) {
+                emit EASAttestFailed(subject, reason);
+            }
+        }
+    }
+
+    function _buildEASData(address subject, bool approved, uint32 riskScore, bytes32 attestationHash)
+        internal
+        view
+        returns (bytes memory)
+    {
+        return abi.encode(subject, approved, riskScore, attestationHash, uint64(block.timestamp));
     }
 
     /// @notice Extract workflow identity fields from the metadata parameter of onReport.

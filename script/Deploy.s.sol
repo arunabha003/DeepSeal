@@ -30,6 +30,15 @@ contract Deploy is Script {
         RWAComplianceReceiver receiver = new RWAComplianceReceiver(
             deployer, registry, reportForwarder, expectedWorkflowId, expectedAuthor, expectedWorkflowName
         );
+
+        // Optional: enable automated EAS attestations on each report.
+        address easContract = vm.envOr("EAS_ATTESTATION_CONTRACT", address(0));
+        bytes32 easSchemaUid = vm.envOr("EAS_SCHEMA_UID", bytes32(0));
+        bool easRevocable = vm.envOr("EAS_REVOCABLE", true);
+        if (easContract != address(0) && easSchemaUid != bytes32(0)) {
+            receiver.setEAS(easContract, easSchemaUid, easRevocable);
+        }
+
         registry.setWorkflowOperator(address(receiver));
         RWAVault vault = new RWAVault(asset, registry, "RWA Vault Share", "RWAV");
         DiligencePortal portal = new DiligencePortal();
@@ -59,5 +68,7 @@ contract Deploy is Script {
         console2.log("ERC8004 IdentityRegistry:", address(identityRegistry));
         console2.log("ERC8004 ReputationRegistry:", address(reputationRegistry));
         console2.log("ERC8004 ValidationRegistry:", address(validationRegistry));
+        console2.log("EAS Attestation Contract:", easContract);
+        console2.logBytes32(easSchemaUid);
     }
 }
