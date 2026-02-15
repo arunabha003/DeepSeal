@@ -15,6 +15,9 @@ forge build
 forge test
 ```
 
+## Sepolia demo
+Runbook: `docs/sepolia-demo.md`.
+
 ## Local deploy (anvil)
 Terminal 1:
 ```bash
