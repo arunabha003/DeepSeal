@@ -9,6 +9,9 @@ import {ComplianceRegistry} from "../src/ComplianceRegistry.sol";
 import {DiligencePortal} from "../src/DiligencePortal.sol";
 import {RWAComplianceReceiver} from "../src/RWAComplianceReceiver.sol";
 import {RWAVault} from "../src/RWAVault.sol";
+import {IdentityRegistry} from "../src/erc8004/IdentityRegistry.sol";
+import {ReputationRegistry} from "../src/erc8004/ReputationRegistry.sol";
+import {ValidationRegistry} from "../src/erc8004/ValidationRegistry.sol";
 
 contract Deploy is Script {
     function run() external {
@@ -31,6 +34,12 @@ contract Deploy is Script {
         RWAVault vault = new RWAVault(asset, registry, "RWA Vault Share", "RWAV");
         DiligencePortal portal = new DiligencePortal();
 
+        IdentityRegistry identityRegistry = new IdentityRegistry();
+        ReputationRegistry reputationRegistry = new ReputationRegistry();
+        reputationRegistry.initialize(address(identityRegistry));
+        ValidationRegistry validationRegistry = new ValidationRegistry();
+        validationRegistry.initialize(address(identityRegistry));
+
         // Optional: seed deployer with demo funds for local testing
         uint256 seedAmount = vm.envOr("SEED_AMOUNT", uint256(1_000_000e6));
         asset.mint(deployer, seedAmount);
@@ -47,5 +56,8 @@ contract Deploy is Script {
         console2.log("RWAComplianceReceiver:", address(receiver));
         console2.log("RWAVault:", address(vault));
         console2.log("DiligencePortal:", address(portal));
+        console2.log("ERC8004 IdentityRegistry:", address(identityRegistry));
+        console2.log("ERC8004 ReputationRegistry:", address(reputationRegistry));
+        console2.log("ERC8004 ValidationRegistry:", address(validationRegistry));
     }
 }
