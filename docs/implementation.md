@@ -14,6 +14,13 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
 - EAS helper scripts (optional audit trail):
   - `script/EASRegisterSchema.s.sol`
   - `script/EASAttest.s.sol`
+- ERC-8004 agent primitives (identity + reputation + validation):
+  - `src/erc8004/IdentityRegistry.sol`
+  - `src/erc8004/ReputationRegistry.sol`
+  - `src/erc8004/ValidationRegistry.sol`
+  - helper scripts in `script/*Validation*.s.sol`, `script/AgentRegister.s.sol`, `script/GiveFeedback.s.sol`
+- x402-ready KYB provider (seller/paywall) with free route for CRE simulation:
+  - `services/kyb-provider/src/server.mjs`
 - CRE project scaffold + workflow:
   - `cre/chainlink-Convergence/my-workflow/main.ts` (HTTP trigger)
   - `cre/abi/*.json` (ABIs exported for integration)
@@ -23,11 +30,11 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
   - `cre/chainlink-Convergence/my-workflow/config.staging.json`
 - Run and record the full demo:
   - submit request → simulate workflow → registry updated → vault deposit succeeds
-- Replace KYB stub with a real provider (later)
+- Optional: enable x402 on the KYB provider and add a paid-call demo (buyer wallet + USDC)
+- Replace KYB stub/provider logic with a real KYB/KYC provider (later)
 
 ## Known issues / fixes
 - If `cre workflow simulate` fails while creating the engine, ensure:
   - `cre version` is current (`cre update`)
   - Your `project.yaml` RPC is reachable
   - If using EVM log triggers, use a WebSocket RPC; this workflow uses HTTP trigger to avoid subscriptions for now.
-

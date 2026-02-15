@@ -6,8 +6,14 @@ ERC‑4626 vault gated by an onchain compliance registry, intended to be driven 
 - `src/ComplianceRegistry.sol`: stores per-address approvals + riskScore + attestationHash; updates allowed by `owner` or `workflowOperator`.
 - `src/RWAVault.sol`: ERC‑4626 vault that blocks `deposit/mint` unless **both** caller and receiver are approved in `ComplianceRegistry`.
 - `src/DemoUSD.sol`: demo underlying ERC‑20 (6 decimals) for local/testnet demos.
-- `script/Deploy.s.sol`: deploys `DemoUSD`, `ComplianceRegistry`, `RWAVault`.
+- `src/erc8004/*`: ERC‑8004 Identity/Reputation/Validation registries (agent reputation primitives).
+- `script/Deploy.s.sol`: deploys `DemoUSD`, `ComplianceRegistry`, `RWAVault`, plus ERC‑8004 registries.
 - `script/Configure.s.sol`: manually sets approval on the registry (useful until CRE workflow is wired).
+- ERC‑8004 helper scripts:
+  - `script/AgentRegister.s.sol`
+  - `script/GiveFeedback.s.sol`
+  - `script/RequestValidation.s.sol`
+  - `script/RespondValidation.s.sol`
 
 ## Build & test
 ```bash
@@ -42,16 +48,18 @@ export ATTESTATION_HASH=0x000000000000000000000000000000000000000000000000000000
 forge script script/Configure.s.sol:Configure --rpc-url http://127.0.0.1:8545 --broadcast
 ```
 
-## Mock KYB provider + real Gemini (dev runner)
-Until you pick a real KYB/KYC provider, there’s a minimal local HTTP service and a runner script that:
+## KYB provider (x402-ready) + real Gemini (dev runner)
+Until you pick a real KYB/KYC provider, there’s a minimal local KYB service and a runner script that:
 1) reads a diligence request from `DiligencePortal`
-2) calls the KYB stub (`tools/kyb-stub/server.mjs`)
+2) calls the KYB endpoint (free route by default; x402 can be enabled on `/kyb`)
 3) calls Gemini for risk JSON
 4) writes the decision to `RWAComplianceReceiver.onReport(...)` (which updates `ComplianceRegistry`)
 
 Terminal 1:
 ```bash
-node tools/kyb-stub/server.mjs
+cd services/kyb-provider
+npm install
+npm run dev
 ```
 
 Terminal 2 (example):
@@ -64,6 +72,10 @@ export REQUEST_ID=1
 export GEMINI_API_KEY=...
 node tools/process-request.mjs
 ```
+
+Notes:
+- CRE workflow configs default `kybUrl` to `http://127.0.0.1:3001/kyb/free`.
+- To enable x402 on `POST /kyb`, set `X402_ENABLED=true` in `services/kyb-provider/.env` (see `.env.example`).
 
 ## EAS (optional audit trail)
 Register a schema (once) and create an attestation for a diligence decision.

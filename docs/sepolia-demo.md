@@ -26,6 +26,9 @@ Record the deployed addresses printed by the script:
 - `RWAComplianceReceiver`
 - `ComplianceRegistry`
 - `RWAVault`
+- `ERC8004 IdentityRegistry`
+- `ERC8004 ReputationRegistry`
+- `ERC8004 ValidationRegistry`
 
 ## 2) Submit an onchain diligence request
 ```bash
@@ -39,7 +42,15 @@ forge script script/SubmitRequest.s.sol:SubmitRequest --rpc-url "$RPC_URL" --bro
 
 Note the `RequestId` from the script output.
 
-## 3) Start KYB stub (local)
+## 3) Start KYB provider (local)
+Preferred (x402-ready provider; use the free route for CRE simulation):
+```bash
+cd services/kyb-provider
+npm install
+npm run dev
+```
+
+Legacy stub (no x402):
 ```bash
 node tools/kyb-stub/server.mjs
 ```
@@ -49,6 +60,7 @@ Edit:
 - `cre/chainlink-Convergence/my-workflow/config.staging.json`
   - `diligencePortalAddress`
   - `receiverAddress`
+  - `kybUrl` (defaults to `http://127.0.0.1:3001/kyb/free`)
 
 Create `cre/chainlink-Convergence/.env` from `cre/chainlink-Convergence/.env.example`:
 - `CRE_ETH_PRIVATE_KEY` (same key as above)
@@ -84,4 +96,3 @@ cast send "$ASSET_ADDRESS" "approve(address,uint256)(bool)" "$VAULT_ADDRESS" 100
 # Deposit
 cast send "$VAULT_ADDRESS" "deposit(uint256,address)(uint256)" 1000000 "$SUBJECT" --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL"
 ```
-
