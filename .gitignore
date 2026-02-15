@@ -6,4 +6,6 @@
 .env
 plan.md
 STATUS.md
+**/node_modules/
+cre/**/tmp.*
 STATUS.d
