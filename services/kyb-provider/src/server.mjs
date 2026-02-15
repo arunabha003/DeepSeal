@@ -22,6 +22,106 @@ const mustEnv = (name) => {
   return v
 }
 
+const sumsubEnabled =
+  Boolean(process.env.SUMSUB_APP_TOKEN && process.env.SUMSUB_SECRET_KEY) ||
+  Boolean(process.env.SUMSUB_APP_TOKEN && process.env.SUMSUB_SECRET)
+
+const sumsubBaseUrl = String(process.env.SUMSUB_BASE_URL || 'https://api.sumsub.com').replace(/\/+$/, '')
+const sumsubToken = process.env.SUMSUB_APP_TOKEN
+const sumsubSecret = process.env.SUMSUB_SECRET_KEY || process.env.SUMSUB_SECRET
+const sumsubLevelName = process.env.SUMSUB_LEVEL_NAME
+
+const hmacSha256Hex = (secretKey, msg) =>
+  crypto.createHmac('sha256', secretKey).update(msg, 'utf8').digest('hex')
+
+const sha256Hex = (msg) => crypto.createHash('sha256').update(msg, 'utf8').digest('hex')
+
+const sumsubRequest = async ({ method, path, body }) => {
+  if (!sumsubEnabled) {
+    throw new Error(
+      'Sumsub not configured. Set SUMSUB_APP_TOKEN and SUMSUB_SECRET_KEY in services/kyb-provider/.env.',
+    )
+  }
+
+  const url = new URL(sumsubBaseUrl + path)
+  const ts = Math.floor(Date.now() / 1000).toString()
+  const bodyStr = body ? JSON.stringify(body) : ''
+  const sig = hmacSha256Hex(sumsubSecret, ts + method.toUpperCase() + url.pathname + url.search + bodyStr)
+
+  const res = await fetch(url, {
+    method,
+    headers: {
+      'content-type': 'application/json',
+      'X-App-Token': sumsubToken,
+      'X-App-Access-Sig': sig,
+      'X-App-Access-Ts': ts,
+    },
+    body: body ? bodyStr : undefined,
+  })
+
+  const text = await res.text()
+  let json = null
+  try {
+    json = text ? JSON.parse(text) : null
+  } catch {
+    json = null
+  }
+
+  return { ok: res.ok, status: res.status, json, text }
+}
+
+const getOrCreateApplicantId = async ({ externalUserId, applicant }) => {
+  const lookupPath = `/resources/applicants/-;externalUserId=${encodeURIComponent(externalUserId)}/one`
+  const lookup = await sumsubRequest({ method: 'GET', path: lookupPath })
+
+  if (lookup.ok && lookup.json?.id) return lookup.json.id
+
+  if (!applicant) {
+    throw new Error(
+      `No Sumsub applicant found for externalUserId=${externalUserId}. Provide applicant info or create applicant in Sumsub dashboard.`,
+    )
+  }
+
+  if (!sumsubLevelName) {
+    throw new Error('Missing SUMSUB_LEVEL_NAME in services/kyb-provider/.env (the verification level to use).')
+  }
+
+  const createPath = `/resources/applicants?levelName=${encodeURIComponent(sumsubLevelName)}`
+  const createBody = {
+    externalUserId,
+    ...applicant,
+  }
+
+  const created = await sumsubRequest({ method: 'POST', path: createPath, body: createBody })
+  if (!created.ok || !created.json?.id) {
+    throw new Error(`Failed to create applicant: status=${created.status} body=${created.text}`)
+  }
+  return created.json.id
+}
+
+const requestApplicantCheck = async ({ applicantId, reason }) => {
+  const path = `/resources/applicants/${encodeURIComponent(applicantId)}/status/pending?reason=${encodeURIComponent(
+    reason || 'kyb',
+  )}`
+  const r = await sumsubRequest({ method: 'POST', path, body: {} })
+  // If it fails, it might already be pending/complete. Don't hard-fail the KYB response.
+  return r
+}
+
+const getApplicantStatus = async ({ applicantId }) => {
+  const path = `/resources/applicants/${encodeURIComponent(applicantId)}/status`
+  const r = await sumsubRequest({ method: 'GET', path })
+  if (!r.ok) throw new Error(`Failed to get applicant status: status=${r.status} body=${r.text}`)
+  return r.json
+}
+
+const getRequiredIdDocsStatus = async ({ applicantId }) => {
+  const path = `/resources/applicants/${encodeURIComponent(applicantId)}/requiredIdDocsStatus`
+  const r = await sumsubRequest({ method: 'GET', path })
+  if (!r.ok) throw new Error(`Failed to get requiredIdDocsStatus: status=${r.status} body=${r.text}`)
+  return r.json
+}
+
 const toPaymentRequirements = (req) => {
   const payTo = mustEnv('X402_PAY_TO')
   const network = String(process.env.X402_NETWORK || 'base-sepolia')
@@ -54,28 +154,69 @@ const toPaymentRequirements = (req) => {
 
 app.get('/healthz', (_req, res) => res.status(200).json({ ok: true, x402Enabled }))
 
-const compute = (payload) => {
-  const raw = JSON.stringify(payload ?? {})
-  const digest = crypto.createHash('sha256').update(raw).digest('hex')
-  const score = parseInt(digest.slice(0, 4), 16) % 1000
-  const providerStatus = score <= 700 ? 'APPROVED' : 'REJECTED'
+const sumsubVerify = async (payload) => {
+  const subject = payload?.subject
+  if (!subject || typeof subject !== 'string') throw new Error('Missing subject (wallet address) in request body')
+
+  const applicant =
+    payload?.companyInfo && typeof payload.companyInfo === 'object'
+      ? {
+          type: 'company',
+          fixedInfo: { companyInfo: payload.companyInfo },
+        }
+      : null
+
+  const applicantId = await getOrCreateApplicantId({ externalUserId: subject.toLowerCase(), applicant })
+  await requestApplicantCheck({ applicantId, reason: 'kyb' })
+
+  const status = await getApplicantStatus({ applicantId })
+  const docs = await getRequiredIdDocsStatus({ applicantId })
+
+  const reviewStatus = String(status?.reviewStatus || '')
+  const reviewAnswer = String(status?.reviewResult?.reviewAnswer || '')
+
+  const approved = reviewStatus === 'completed' && reviewAnswer === 'GREEN'
+  const pending = reviewStatus !== 'completed' && reviewAnswer !== 'RED'
+
+  const providerStatus = approved ? 'APPROVED' : 'REJECTED'
+  const providerScore = approved ? 10 : pending ? 500 : 900
+
+  const responseHash = sha256Hex(
+    JSON.stringify({
+      applicantId,
+      reviewStatus,
+      reviewAnswer,
+      docs,
+    }),
+  )
 
   return {
     providerStatus,
-    providerScore: score,
-    providerResponseHash: `0x${digest.padEnd(64, '0').slice(0, 64)}`,
+    providerScore,
+    providerResponseHash: `0x${responseHash.padEnd(64, '0').slice(0, 64)}`,
+    sumsub: { applicantId, reviewStatus, reviewAnswer },
   }
 }
 
 // Free path for CRE workflow simulation until x402 buyer support is wired in.
-app.post('/kyb/free', (req, res) => {
-  res.status(200).json(compute(req.body))
+app.post('/kyb/free', async (req, res) => {
+  try {
+    const out = await sumsubVerify(req.body)
+    res.status(200).json(out)
+  } catch (e) {
+    res.status(400).json({ error: String(e?.message || e) })
+  }
 })
 
 // Paywalled path when X402_ENABLED=true.
 app.post('/kyb', async (req, res) => {
   if (!x402Enabled) {
-    return res.status(200).json(compute(req.body))
+    try {
+      const out = await sumsubVerify(req.body)
+      return res.status(200).json(out)
+    } catch (e) {
+      return res.status(400).json({ error: String(e?.message || e) })
+    }
   }
 
   const accepts = toPaymentRequirements(req)
@@ -110,7 +251,8 @@ app.post('/kyb', async (req, res) => {
     }
 
     res.setHeader('X-PAYMENT-RESPONSE', settleResponseHeader(settleResp))
-    return res.status(200).json(compute(req.body))
+    const out = await sumsubVerify(req.body)
+    return res.status(200).json(out)
   } catch (e) {
     return res.status(402).json({
       x402Version,
@@ -118,6 +260,22 @@ app.post('/kyb', async (req, res) => {
       error: 'unexpected_verify_error',
       detail: String(e?.message || e),
     })
+  }
+})
+
+// Sandbox helper: force an applicant to complete with a given reviewAnswer (GREEN/RED).
+// This uses Sumsub's sandbox-only endpoint described in their docs.
+app.post('/sumsub/sandbox/testCompleted', async (req, res) => {
+  try {
+    const applicantId = req.body?.applicantId
+    const reviewAnswer = req.body?.reviewAnswer || 'GREEN'
+    if (!applicantId) return res.status(400).json({ error: 'Missing applicantId' })
+
+    const path = `/resources/applicants/${encodeURIComponent(applicantId)}/status/testCompleted`
+    const r = await sumsubRequest({ method: 'POST', path, body: { reviewAnswer } })
+    return res.status(r.ok ? 200 : 400).json(r.json || { status: r.status, body: r.text })
+  } catch (e) {
+    return res.status(400).json({ error: String(e?.message || e) })
   }
 })
 

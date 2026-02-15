@@ -51,6 +51,15 @@ type Config = z.infer<typeof configSchema>
 
 const requestSchema = z.object({
 	requestId: z.union([z.number().int().positive(), z.string().regex(/^[0-9]+$/)]),
+	companyInfo: z
+		.object({
+			companyName: z.string().min(1),
+			country: z.string().min(2),
+			registrationNumber: z.string().optional(),
+			incorporatedOn: z.string().optional(),
+			website: z.string().optional(),
+		})
+		.optional(),
 })
 
 type DiligenceRequest = {
@@ -205,13 +214,20 @@ const buildXPaymentHeaderExactEvm = (accept: X402Accept, buyerPrivateKey: `0x${s
 	return Buffer.from(JSON.stringify(payload)).toString('base64')
 }
 
-const fetchKybHttp = (sendRequester: HTTPSendRequester, config: Config, req: DiligenceRequest, runtime: Runtime<Config>): KYBResult => {
+const fetchKybHttp = (
+	sendRequester: HTTPSendRequester,
+	config: Config,
+	req: DiligenceRequest,
+	runtime: Runtime<Config>,
+	companyInfo?: any,
+): KYBResult => {
 	const body = Buffer.from(
 		new TextEncoder().encode(
 			JSON.stringify({
 				subject: req.subject,
 				docBundleHash: req.docBundleHash,
 				metadataUri: req.metadataUri,
+				companyInfo: companyInfo || undefined,
 			}),
 		),
 	).toString('base64')
@@ -285,11 +301,13 @@ const fetchKybConfidential = (
 	config: Config,
 	req: DiligenceRequest,
 	runtime: Runtime<Config>,
+	companyInfo?: any,
 ): KYBResult => {
 	const bodyString = JSON.stringify({
 		subject: req.subject,
 		docBundleHash: req.docBundleHash,
 		metadataUri: req.metadataUri,
+		companyInfo: companyInfo || undefined,
 	})
 
 	const initial = sendRequester
@@ -463,6 +481,7 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 	const inputJson = Buffer.from(payload.input).toString('utf-8')
 	const parsed = requestSchema.parse(JSON.parse(inputJson))
 	const requestId = BigInt(typeof parsed.requestId === 'string' ? parsed.requestId : parsed.requestId)
+	const companyInfo = parsed.companyInfo
 
 	runtime.log(`Processing diligence requestId=${requestId.toString()}`)
 
@@ -474,7 +493,8 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 		? new ConfidentialHTTPClient()
 				.sendRequest(
 					runtime,
-					(sr: ConfidentialHTTPSendRequester, cfg: Config) => fetchKybConfidential(sr, cfg, req, runtime),
+					(sr: ConfidentialHTTPSendRequester, cfg: Config) =>
+						fetchKybConfidential(sr, cfg, req, runtime, companyInfo),
 					ConsensusAggregationByFields<KYBResult>({
 						providerStatus: identical,
 						providerScore: median,
@@ -485,7 +505,7 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 		: new HTTPClient()
 				.sendRequest(
 					runtime,
-					(sr: HTTPSendRequester, cfg: Config) => fetchKybHttp(sr, cfg, req, runtime),
+					(sr: HTTPSendRequester, cfg: Config) => fetchKybHttp(sr, cfg, req, runtime, companyInfo),
 					ConsensusAggregationByFields<KYBResult>({
 						providerStatus: identical,
 						providerScore: median,

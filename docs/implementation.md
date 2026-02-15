@@ -21,6 +21,8 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
   - helper scripts in `script/*Validation*.s.sol`, `script/AgentRegister.s.sol`, `script/GiveFeedback.s.sol`
 - x402-ready KYB provider (seller/paywall) with free route for CRE simulation:
   - `services/kyb-provider/src/server.mjs`
+- Sumsub (Sandbox) KYB integration (real provider API):
+  - `docs/sumsub-setup.md`
 - Automated EAS attestations (optional) on each report:
   - `src/RWAComplianceReceiver.sol` (configurable via `setEAS(...)`, wired in `script/Deploy.s.sol`)
 - CRE project scaffold + workflow:

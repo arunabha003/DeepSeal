@@ -85,6 +85,8 @@ cre workflow simulate ./my-workflow --trigger-index 0 --http-payload ./http-payl
 
 If your `cre` CLI prompts interactively for the HTTP trigger input, paste JSON directly (e.g. `{"requestId": 1}`) or enter the file path `./http-payload.local.json`.
 
+If you are using Sumsub and want the KYB provider to create a sandbox applicant automatically, include `companyInfo` in the payload. See `docs/sumsub-setup.md`.
+
 ## 6) Verify onchain state + vault gate
 Read approval status:
 ```bash
