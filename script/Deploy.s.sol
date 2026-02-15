@@ -6,6 +6,7 @@ import {console2} from "forge-std/console2.sol";
 
 import {DemoUSD} from "../src/DemoUSD.sol";
 import {ComplianceRegistry} from "../src/ComplianceRegistry.sol";
+import {RWAComplianceReceiver} from "../src/RWAComplianceReceiver.sol";
 import {RWAVault} from "../src/RWAVault.sol";
 
 contract Deploy is Script {
@@ -13,12 +14,14 @@ contract Deploy is Script {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerKey);
 
-        address workflowOperator = vm.envOr("WORKFLOW_OPERATOR", deployer);
+        address reportForwarder = vm.envOr("CRE_REPORT_FORWARDER", address(0));
 
         vm.startBroadcast(deployerKey);
 
         DemoUSD asset = new DemoUSD(deployer, "Demo USD", "dUSD", 6);
-        ComplianceRegistry registry = new ComplianceRegistry(deployer, workflowOperator);
+        ComplianceRegistry registry = new ComplianceRegistry(deployer, deployer);
+        RWAComplianceReceiver receiver = new RWAComplianceReceiver(deployer, registry, reportForwarder);
+        registry.setWorkflowOperator(address(receiver));
         RWAVault vault = new RWAVault(asset, registry, "RWA Vault Share", "RWAV");
 
         // Optional: seed deployer with demo funds for local testing
@@ -28,9 +31,10 @@ contract Deploy is Script {
         vm.stopBroadcast();
 
         console2.log("Deployer:", deployer);
-        console2.log("WorkflowOperator:", workflowOperator);
+        console2.log("CREReportForwarder:", reportForwarder);
         console2.log("DemoUSD:", address(asset));
         console2.log("ComplianceRegistry:", address(registry));
+        console2.log("RWAComplianceReceiver:", address(receiver));
         console2.log("RWAVault:", address(vault));
     }
 }
