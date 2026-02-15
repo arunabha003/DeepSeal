@@ -1,0 +1,14 @@
+{
+  "name": "kyb-provider",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/server.mjs",
+    "start": "node src/server.mjs"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "x402": "*"
+  }
+}
+

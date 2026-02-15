@@ -28,7 +28,7 @@ async function main() {
   const receiver = mustEnv("RECEIVER_ADDRESS");
 
   const requestId = mustEnv("REQUEST_ID");
-  const kybUrl = process.env.KYB_URL ?? "http://127.0.0.1:8787/kyb";
+  const kybUrl = process.env.KYB_URL ?? "http://127.0.0.1:3001/kyb/free";
 
   const geminiKey = mustEnv("GEMINI_API_KEY");
   const geminiModel = process.env.GEMINI_MODEL ?? "gemini-1.5-flash";
@@ -174,4 +174,3 @@ main().catch((e) => {
   console.error(e?.stack ?? String(e));
   process.exit(1);
 });
-
