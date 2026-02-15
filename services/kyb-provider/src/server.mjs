@@ -1,5 +1,8 @@
+import dotenv from 'dotenv'
 import crypto from 'node:crypto'
 import express from 'express'
+
+dotenv.config({ path: new URL('../.env', import.meta.url) })
 
 let paymentMiddleware
 try {
@@ -57,4 +60,3 @@ app.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`[kyb-provider] listening on http://localhost:${port} (x402Enabled=${x402Enabled})`)
 })
-
