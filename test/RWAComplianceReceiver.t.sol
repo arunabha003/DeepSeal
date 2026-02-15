@@ -18,7 +18,7 @@ contract RWAComplianceReceiverTest is Test {
 
         // forwarder unset -> anyone can call onReport (local testing)
         vm.prank(owner);
-        receiver = new RWAComplianceReceiver(owner, registry, address(0));
+        receiver = new RWAComplianceReceiver(owner, registry, address(0), bytes32(0), address(0), bytes10(0));
 
         vm.prank(owner);
         registry.setWorkflowOperator(address(receiver));
@@ -29,7 +29,7 @@ contract RWAComplianceReceiverTest is Test {
         bytes32 attHash = keccak256("att");
 
         bytes memory report = abi.encode(subject, true, uint32(123), attHash);
-        receiver.onReport("", report);
+        receiver.onReport(_metadata(bytes32(0), bytes10(0), address(0)), report);
 
         ComplianceRegistry.ComplianceRecord memory rec = registry.getRecord(subject);
         assertTrue(rec.approved);
@@ -44,14 +44,41 @@ contract RWAComplianceReceiverTest is Test {
 
         address forwarder = address(0xF00D);
         vm.prank(owner);
-        receiver.setReportForwarder(forwarder);
+        receiver.setForwarder(forwarder);
 
         vm.prank(address(0xBAD));
         vm.expectRevert(abi.encodeWithSelector(RWAComplianceReceiver.InvalidForwarder.selector, address(0xBAD)));
-        receiver.onReport("", report);
+        receiver.onReport(_metadata(bytes32(0), bytes10(0), address(0)), report);
 
         vm.prank(forwarder);
-        receiver.onReport("", report);
+        receiver.onReport(_metadata(bytes32(0), bytes10(0), address(0)), report);
         assertTrue(registry.isApproved(subject));
+    }
+
+    function test_onReportValidatesWorkflowIdentity() external {
+        bytes32 wid = keccak256("workflow");
+        bytes10 wname = bytes10("RWA_DD_V1");
+        address author = address(0xABCD);
+
+        vm.prank(owner);
+        receiver.setExpectedWorkflow(wid, author, wname);
+
+        bytes memory report = abi.encode(address(0xBEEF), true, uint32(1), keccak256("att"));
+
+        vm.expectRevert(abi.encodeWithSelector(RWAComplianceReceiver.InvalidWorkflowId.selector, bytes32(uint256(1)), wid));
+        receiver.onReport(_metadata(bytes32(uint256(1)), wname, author), report);
+
+        vm.expectRevert(abi.encodeWithSelector(RWAComplianceReceiver.InvalidAuthor.selector, address(0xBEEF), author));
+        receiver.onReport(_metadata(wid, wname, address(0xBEEF)), report);
+
+        vm.expectRevert(abi.encodeWithSelector(RWAComplianceReceiver.InvalidWorkflowName.selector, bytes10("WRONG____"), wname));
+        receiver.onReport(_metadata(wid, bytes10("WRONG____"), author), report);
+
+        receiver.onReport(_metadata(wid, wname, author), report);
+        assertTrue(registry.isApproved(address(0xBEEF)));
+    }
+
+    function _metadata(bytes32 workflowId, bytes10 workflowName, address workflowOwner) private pure returns (bytes memory) {
+        return abi.encodePacked(workflowId, workflowName, workflowOwner);
     }
 }

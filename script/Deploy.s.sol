@@ -15,12 +15,17 @@ contract Deploy is Script {
         address deployer = vm.addr(deployerKey);
 
         address reportForwarder = vm.envOr("CRE_REPORT_FORWARDER", address(0));
+        bytes32 expectedWorkflowId = vm.envOr("CRE_WORKFLOW_ID", bytes32(0));
+        address expectedAuthor = vm.envOr("CRE_WORKFLOW_AUTHOR", address(0));
+        bytes10 expectedWorkflowName = bytes10(vm.envOr("CRE_WORKFLOW_NAME", bytes32(0)));
 
         vm.startBroadcast(deployerKey);
 
         DemoUSD asset = new DemoUSD(deployer, "Demo USD", "dUSD", 6);
         ComplianceRegistry registry = new ComplianceRegistry(deployer, deployer);
-        RWAComplianceReceiver receiver = new RWAComplianceReceiver(deployer, registry, reportForwarder);
+        RWAComplianceReceiver receiver = new RWAComplianceReceiver(
+            deployer, registry, reportForwarder, expectedWorkflowId, expectedAuthor, expectedWorkflowName
+        );
         registry.setWorkflowOperator(address(receiver));
         RWAVault vault = new RWAVault(asset, registry, "RWA Vault Share", "RWAV");
 
@@ -32,6 +37,9 @@ contract Deploy is Script {
 
         console2.log("Deployer:", deployer);
         console2.log("CREReportForwarder:", reportForwarder);
+        console2.logBytes32(expectedWorkflowId);
+        console2.log("ExpectedAuthor:", expectedAuthor);
+        console2.logBytes32(bytes32(expectedWorkflowName));
         console2.log("DemoUSD:", address(asset));
         console2.log("ComplianceRegistry:", address(registry));
         console2.log("RWAComplianceReceiver:", address(receiver));
