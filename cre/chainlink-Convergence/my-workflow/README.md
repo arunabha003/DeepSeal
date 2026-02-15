@@ -18,12 +18,14 @@ Create `../.env` from `../.env.example` and set:
 Edit `config.staging.json`:
 - `diligencePortalAddress` (deployed `DiligencePortal`)
 - `receiverAddress` (deployed `RWAComplianceReceiver`)
-- `kybUrl` (local stub: `http://127.0.0.1:8787/kyb`)
+- `kybUrl` (local provider free route: `http://127.0.0.1:3001/kyb/free`)
 
-## 4) Run KYB stub (local)
+## 4) Run KYB provider (local)
 In repo root:
 ```bash
-node tools/kyb-stub/server.mjs
+cd services/kyb-provider
+npm install
+npm run dev
 ```
 
 ## 5) Simulate

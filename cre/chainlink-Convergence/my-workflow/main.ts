@@ -338,7 +338,7 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 
 const initWorkflow = (config: Config) => {
 	const httpTrigger = new HTTPCapability()
-	return [handler(httpTrigger.trigger({ authorizedKeys: [] }), onHttpTrigger)]
+	return [handler(httpTrigger.trigger({}), onHttpTrigger)]
 }
 
 export async function main() {
