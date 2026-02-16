@@ -3,8 +3,8 @@
 End-to-end path:
 1) deploy contracts
 2) submit diligence request (onchain)
-3) run KYB stub locally
-4) simulate CRE workflow with HTTP trigger (Gemini + KYB stub) and broadcast the onchain `writeReport`
+3) run Sumsub-backed KYB provider locally
+4) simulate CRE workflow with HTTP trigger (Gemini + Sumsub KYB) and broadcast the onchain `writeReport`
 5) verify registry updated and vault deposit succeeds
 
 ## 1) Deploy contracts
@@ -42,19 +42,14 @@ forge script script/SubmitRequest.s.sol:SubmitRequest --rpc-url "$RPC_URL" --bro
 
 Note the `RequestId` from the script output.
 
-## 3) Start KYB provider (local)
-Preferred (x402-ready provider; use the free route for CRE simulation):
+## 3) Start KYB provider (local, Sumsub-backed)
+Use the x402-ready provider. For first-pass e2e, keep `X402_ENABLED=false` and use `/kyb/free`.
 ```bash
 cd services/kyb-provider
 npm install
-# optional: enable x402 paywall on POST /kyb
-# cp .env.example .env && edit X402_ENABLED=true and X402_PAY_TO=<your wallet>
+# configure SUMSUB_APP_TOKEN, SUMSUB_SECRET_KEY, SUMSUB_LEVEL_NAME in .env
+# cp .env.example .env
 npm run dev
-```
-
-Legacy stub (no x402):
-```bash
-node tools/kyb-stub/server.mjs
 ```
 
 ## 4) Configure CRE workflow + secrets
@@ -71,6 +66,11 @@ Create `cre/chainlink-Convergence/.env` from `cre/chainlink-Convergence/.env.exa
 - `CRE_ETH_PRIVATE_KEY` (same key as above)
 - `GEMINI_API_KEY`
  - Optional: `X402_BUYER_PRIVATE_KEY`
+
+Run readiness checks before simulation:
+```bash
+node tools/readiness-check.mjs
+```
 
 ## 5) Simulate workflow (HTTP trigger) and broadcast
 From `cre/chainlink-Convergence`:

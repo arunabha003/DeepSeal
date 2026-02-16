@@ -1,8 +1,8 @@
-# Diligence Workflow (HTTP Trigger → KYB stub + Gemini → onchain writeReport)
+# Diligence Workflow (HTTP Trigger → Sumsub KYB + Gemini → onchain writeReport)
 
 This workflow processes an onchain diligence request stored in `DiligencePortal` by:
 1) reading the request data onchain (`getRequest(requestId)`)
-2) calling a KYB verification endpoint (mock for now; local stub)
+2) calling a KYB verification endpoint (Sumsub sandbox via local provider)
 3) calling Gemini for a strict JSON risk decision
 4) writing the decision onchain via `EVMClient.writeReport` to `RWAComplianceReceiver`
 

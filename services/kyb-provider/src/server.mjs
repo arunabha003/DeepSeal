@@ -142,7 +142,7 @@ const toPaymentRequirements = (req) => {
       network,
       maxAmountRequired,
       resource,
-      description: 'KYB verification (mock logic, real x402 payment rail)',
+      description: 'KYB verification (Sumsub sandbox) with x402 payment rail',
       mimeType: 'application/json',
       payTo,
       maxTimeoutSeconds: timeout,

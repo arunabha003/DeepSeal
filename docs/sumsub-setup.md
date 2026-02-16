@@ -45,3 +45,14 @@ The CRE HTTP trigger supports an optional `companyInfo` object (passed through t
 }
 ```
 
+## Business verification input notes
+For business KYB, provide at least:
+- `companyName`
+- `country` (ISO-3 country code, e.g. `USA`)
+
+Optional fields you can add as available:
+- `registrationNumber`
+- `incorporatedOn`
+- `website`
+
+If the applicant already exists in Sumsub for the wallet subject (`externalUserId`), `companyInfo` is not required.

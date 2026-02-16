@@ -61,11 +61,14 @@ async function main() {
 
   const [, requester, subject, docBundleHash, metadataUri] = m;
 
-  // 2) KYB verification (mock provider for now)
+  const companyInfoJson = process.env.COMPANY_INFO_JSON;
+  const companyInfo = companyInfoJson ? JSON.parse(companyInfoJson) : undefined;
+
+  // 2) KYB verification (Sumsub-backed provider)
   const kybResp = await fetch(kybUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ subject, docBundleHash, metadataUri }),
+    body: JSON.stringify({ subject, docBundleHash, metadataUri, companyInfo }),
   });
   const kybJson = await kybResp.json();
   if (!kybResp.ok) throw new Error(`KYB failed: ${JSON.stringify(kybJson)}`);

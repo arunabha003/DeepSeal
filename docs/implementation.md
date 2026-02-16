@@ -28,6 +28,8 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
 - CRE project scaffold + workflow:
   - `cre/chainlink-Convergence/my-workflow/main.ts` (HTTP trigger)
   - `cre/abi/*.json` (ABIs exported for integration)
+- Preflight helper:
+  - `tools/readiness-check.mjs` validates CRE config addresses + deployed code + KYB provider health before simulate.
 
 ## What’s left
 - Deploy contracts to Sepolia and fill:
@@ -35,7 +37,7 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
 - Run and record the full demo:
   - submit request → simulate workflow → registry updated → vault deposit succeeds
 - Optional: enable x402 on the KYB provider and add a paid-call demo (buyer wallet + USDC) or enable `x402Enabled=true` in the CRE workflow config.
-- Replace KYB stub/provider logic with a real KYB/KYC provider (later)
+- Optional hardening: enforce workflow identity pinning + forwarder in production deployment.
 
 ## Known issues / fixes
 - If `cre workflow simulate` fails while creating the engine, ensure:

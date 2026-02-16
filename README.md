@@ -23,6 +23,7 @@ forge test
 
 ## Sepolia demo
 Runbook: `docs/sepolia-demo.md`.
+Quick preflight: `node tools/readiness-check.mjs`.
 
 ## Local deploy (anvil)
 Terminal 1:
@@ -48,10 +49,10 @@ export ATTESTATION_HASH=0x000000000000000000000000000000000000000000000000000000
 forge script script/Configure.s.sol:Configure --rpc-url http://127.0.0.1:8545 --broadcast
 ```
 
-## KYB provider (x402-ready) + real Gemini (dev runner)
-Until you pick a real KYB/KYC provider, there’s a minimal local KYB service and a runner script that:
+## KYB provider (x402-ready, Sumsub-backed) + real Gemini (dev runner)
+The local KYB service integrates Sumsub Sandbox and the runner script:
 1) reads a diligence request from `DiligencePortal`
-2) calls the KYB endpoint (free route by default; x402 can be enabled on `/kyb`)
+2) calls the KYB endpoint (`/kyb/free` by default; x402 can be enabled on `/kyb`)
 3) calls Gemini for risk JSON
 4) writes the decision to `RWAComplianceReceiver.onReport(...)` (which updates `ComplianceRegistry`)
 
@@ -70,12 +71,15 @@ export PORTAL_ADDRESS=0x...
 export RECEIVER_ADDRESS=0x...
 export REQUEST_ID=1
 export GEMINI_API_KEY=...
+# optional for Sumsub applicant creation:
+# export COMPANY_INFO_JSON='{"companyName":"Acme LLC","country":"USA","registrationNumber":"1234567"}'
 node tools/process-request.mjs
 ```
 
 Notes:
 - CRE workflow configs default `kybUrl` to `http://127.0.0.1:3001/kyb/free`.
 - To enable x402 on `POST /kyb`, set `X402_ENABLED=true` and `X402_PAY_TO=<your wallet address>` in `services/kyb-provider/.env` (see `.env.example`). Clients pay by sending an `X-PAYMENT` header; the server responds with `X-PAYMENT-RESPONSE` on success.
+- Sumsub setup details: `docs/sumsub-setup.md`.
 
 ## EAS (optional audit trail)
 Register a schema (once) and create an attestation for a diligence decision.

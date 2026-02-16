@@ -19,9 +19,7 @@ This is the tracked to-do list for hackathon readiness (what still needs doing b
 
 ## Payments (x402)
 - Enable x402 on the KYB provider (`services/kyb-provider/.env`: `X402_ENABLED=true`) and verify `POST /kyb` returns 402 until paid.
-- Decide buyer strategy:
-  - If CRE supports x402 buyer payments, wire it into `my-workflow/main.ts`.
-  - Otherwise, add a small paid-call client (Node script) for demo purposes.
+- Enable workflow-side buyer retry (`x402Enabled=true` in CRE config + `X402_BUYER_PRIVATE_KEY` secret).
  - Record a paid-call proof:
   - 402 response includes `accepts[]`
   - client retries with `X-PAYMENT`
@@ -41,5 +39,4 @@ This is the tracked to-do list for hackathon readiness (what still needs doing b
 
 ## Hardening / polish (optional)
 - Pin `RWAComplianceReceiver` expected workflow identity fields once the workflow is deployed.
-- Replace deterministic KYB logic with a real provider integration (Sumsub/Persona/Onfido/etc.).
 - Add a simple frontend (issuer submit + status page) if time permits.
