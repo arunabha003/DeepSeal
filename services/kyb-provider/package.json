@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "node src/server.mjs",
-    "start": "node src/server.mjs"
+    "start": "node src/server.mjs",
+    "check:sumsub": "node src/sumsub-healthcheck.mjs"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

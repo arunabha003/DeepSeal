@@ -43,7 +43,8 @@ forge script script/SubmitRequest.s.sol:SubmitRequest --rpc-url "$RPC_URL" --bro
 Note the `RequestId` from the script output.
 
 ## 3) Start KYB provider (local, Sumsub-backed)
-Use the x402-ready provider in paid mode (`/kyb`).
+For Anvil/fork e2e, start with free mode (`/kyb/free`, `X402_ENABLED=false`).
+For Base Sepolia paid flow, use paywalled mode (`/kyb`, `X402_ENABLED=true`).
 ```bash
 cd services/kyb-provider
 npm install
@@ -54,18 +55,25 @@ npm run dev
 
 Check Sumsub auth quickly:
 ```bash
+cd services/kyb-provider
+npm run check:sumsub
+```
+
+Or via server endpoint:
+```bash
 curl -s http://127.0.0.1:3001/sumsub/healthz | jq
 ```
 
 ## 4) Configure CRE workflow + secrets
 Edit:
-- `cre/chainlink-Convergence/my-workflow/config.staging.json`
+- `cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json` for Anvil/fork dry run
+- `cre/chainlink-Convergence/my-workflow/config.staging.json` for Base Sepolia paid path
   - `diligencePortalAddress`
   - `receiverAddress`
-  - `kybUrl` (defaults to `http://127.0.0.1:3001/kyb/free`)
+  - `kybUrl` (`/kyb/free` for free mode, `/kyb` for paid mode)
   - Optional:
     - `useConfidentialHttp` (set true only if your CRE environment supports Confidential HTTP)
-    - `x402Enabled` (should be true for paid `POST /kyb` route)
+    - `x402Enabled` (false for free mode, true for paid `POST /kyb`)
 
 Create `cre/chainlink-Convergence/.env` from `cre/chainlink-Convergence/.env.example`:
 - `CRE_ETH_PRIVATE_KEY` (same key as above)

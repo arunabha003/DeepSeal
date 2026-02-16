@@ -13,6 +13,11 @@ Quick auth check after starting provider:
 ```bash
 curl -s http://127.0.0.1:3001/sumsub/healthz | jq
 ```
+Quick auth check without starting the server:
+```bash
+cd services/kyb-provider
+npm run check:sumsub
+```
 Expect:
 - `authValid: true` when token/signature are accepted.
 - `authValid: false` with `401/403` when token/secret/signature mismatch.

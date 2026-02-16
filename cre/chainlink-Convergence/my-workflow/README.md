@@ -15,13 +15,17 @@ Create `../.env` from `../.env.example` and set:
 - `GEMINI_API_KEY`
 
 ## 3) Configure workflow
-Edit `config.staging.json`:
+Pick one config file:
+- `config.anvil-e2e.json` → Anvil/fork e2e, free KYB path (`/kyb/free`), `x402Enabled=false`
+- `config.staging.json` / `config.production.json` → Base Sepolia paid KYB path (`/kyb`), `x402Enabled=true`
+
+Then edit the selected file:
 - `diligencePortalAddress` (deployed `DiligencePortal`)
 - `receiverAddress` (deployed `RWAComplianceReceiver`)
-- `kybUrl` (local provider free route: `http://127.0.0.1:3001/kyb/free`)
+- `kybUrl` (local provider route)
  - Optional:
    - `useConfidentialHttp` (explicit Confidential HTTP client)
-   - `x402Enabled` (if KYB is paywalled on `POST /kyb`)
+   - `x402Enabled` (should match whether KYB is paywalled on `POST /kyb`)
 
 ## 4) Run KYB provider (local)
 In repo root:
@@ -34,7 +38,7 @@ npm run dev
 ## 5) Simulate
 From `cre/chainlink-Convergence`:
 ```bash
-cre workflow simulate ./my-workflow --trigger-index 0 --http-payload ../http-payload.json
+cre workflow simulate ./my-workflow --config ./my-workflow/config.anvil-e2e.json --trigger-index 0 --http-payload ../http-payload.json
 ```
 
 Example `../http-payload.json`:
