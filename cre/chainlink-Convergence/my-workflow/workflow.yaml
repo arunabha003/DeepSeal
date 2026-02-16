@@ -15,6 +15,15 @@
 #     secrets-path: "../secrets.yaml"       # Path to secrets file (project root by default)
 
 # ==========================================================================
+anvil-e2e-settings:
+  user-workflow:
+    workflow-name: "my-workflow-anvil-e2e"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.anvil-e2e.json"
+    secrets-path: ""
+
+# ==========================================================================
 staging-settings:
   user-workflow:
     workflow-name: "my-workflow-staging"
