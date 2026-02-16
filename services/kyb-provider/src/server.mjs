@@ -154,6 +154,41 @@ const toPaymentRequirements = (req) => {
 
 app.get('/healthz', (_req, res) => res.status(200).json({ ok: true, x402Enabled }))
 
+app.get('/sumsub/healthz', async (_req, res) => {
+  if (!sumsubEnabled) {
+    return res.status(500).json({
+      configured: false,
+      authValid: false,
+      error: 'Sumsub env vars missing (SUMSUB_APP_TOKEN, SUMSUB_SECRET_KEY).',
+    })
+  }
+
+  try {
+    // Probe auth by querying a guaranteed-nonexistent externalUserId.
+    // 404 means auth/signing works and resource is absent; 401/403 means auth failure.
+    const probeExternalUserId = `probe-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const path = `/resources/applicants/-;externalUserId=${encodeURIComponent(probeExternalUserId)}/one`
+    const r = await sumsubRequest({ method: 'GET', path })
+
+    const authValid = r.status !== 401 && r.status !== 403
+    return res.status(authValid ? 200 : 502).json({
+      configured: true,
+      authValid,
+      status: r.status,
+      message: authValid
+        ? 'Auth signature accepted by Sumsub.'
+        : 'Sumsub rejected auth/signature. Check app token/secret/signing inputs.',
+      response: r.json || r.text || null,
+    })
+  } catch (e) {
+    return res.status(502).json({
+      configured: true,
+      authValid: false,
+      error: String(e?.message || e),
+    })
+  }
+})
+
 const sumsubVerify = async (payload) => {
   const subject = payload?.subject
   if (!subject || typeof subject !== 'string') throw new Error('Missing subject (wallet address) in request body')

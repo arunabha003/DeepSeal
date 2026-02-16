@@ -66,6 +66,13 @@ function main() {
     die(`KYB provider health check failed: ${kyb.out}`);
   }
 
+  const sumsubProbe = run("curl", ["-sf", "http://127.0.0.1:3001/sumsub/healthz"]);
+  if (!sumsubProbe.ok) {
+    console.log("- Sumsub probe: skipped/unreachable (provider may be down or endpoint unavailable)");
+  } else {
+    console.log(`- Sumsub probe: ${sumsubProbe.out}`);
+  }
+
   console.log("Readiness check passed");
   console.log(`- Config: ${configPath}`);
   console.log(`- Portal: ${cfg.diligencePortalAddress}`);
@@ -74,4 +81,3 @@ function main() {
 }
 
 main();
-

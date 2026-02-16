@@ -9,6 +9,14 @@ This repo integrates Sumsub as the “real” KYB/KYC provider (running in Sumsu
 
 Add them to `services/kyb-provider/.env` (gitignored). Template: `services/kyb-provider/.env.example`.
 
+Quick auth check after starting provider:
+```bash
+curl -s http://127.0.0.1:3001/sumsub/healthz | jq
+```
+Expect:
+- `authValid: true` when token/signature are accepted.
+- `authValid: false` with `401/403` when token/secret/signature mismatch.
+
 ## How the integration works
 - The KYB provider service (`services/kyb-provider`) calls Sumsub API using the signed header scheme.
 - It uses `externalUserId = <subject wallet address>` to look up the applicant:

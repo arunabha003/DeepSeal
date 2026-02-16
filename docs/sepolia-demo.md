@@ -9,7 +9,7 @@ End-to-end path:
 
 ## 1) Deploy contracts
 ```bash
-export RPC_URL='https://ethereum-sepolia-rpc.publicnode.com'
+export RPC_URL='https://sepolia.base.org'
 export PRIVATE_KEY='0x...'
 
 # Optional hardening (leave unset for now)
@@ -43,13 +43,18 @@ forge script script/SubmitRequest.s.sol:SubmitRequest --rpc-url "$RPC_URL" --bro
 Note the `RequestId` from the script output.
 
 ## 3) Start KYB provider (local, Sumsub-backed)
-Use the x402-ready provider. For first-pass e2e, keep `X402_ENABLED=false` and use `/kyb/free`.
+Use the x402-ready provider in paid mode (`/kyb`).
 ```bash
 cd services/kyb-provider
 npm install
-# configure SUMSUB_APP_TOKEN, SUMSUB_SECRET_KEY, SUMSUB_LEVEL_NAME in .env
+# configure SUMSUB_APP_TOKEN, SUMSUB_SECRET_KEY, SUMSUB_LEVEL_NAME, X402_PAY_TO in .env
 # cp .env.example .env
 npm run dev
+```
+
+Check Sumsub auth quickly:
+```bash
+curl -s http://127.0.0.1:3001/sumsub/healthz | jq
 ```
 
 ## 4) Configure CRE workflow + secrets
@@ -60,12 +65,12 @@ Edit:
   - `kybUrl` (defaults to `http://127.0.0.1:3001/kyb/free`)
   - Optional:
     - `useConfidentialHttp` (set true only if your CRE environment supports Confidential HTTP)
-    - `x402Enabled` (set true if using the paywalled `POST /kyb` route and you’ve set `X402_BUYER_PRIVATE_KEY`)
+    - `x402Enabled` (should be true for paid `POST /kyb` route)
 
 Create `cre/chainlink-Convergence/.env` from `cre/chainlink-Convergence/.env.example`:
 - `CRE_ETH_PRIVATE_KEY` (same key as above)
 - `GEMINI_API_KEY`
- - Optional: `X402_BUYER_PRIVATE_KEY`
+- `X402_BUYER_PRIVATE_KEY` (buyer wallet for x402 retries)
 
 Run readiness checks before simulation:
 ```bash
