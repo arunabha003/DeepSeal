@@ -589,9 +589,17 @@ const writeDecision = (runtime: Runtime<Config>, reportHex: `0x${string}`): stri
 		throw new Error(`Failed to write report: ${resp.errorMessage || resp.txStatus}`)
 	}
 
-	const txHash = resp.txHash || new Uint8Array(32)
-	runtime.log(`Write report transaction succeeded at txHash: ${bytesToHex(txHash)}`)
-	return bytesToHex(txHash)
+	const txHash = resp.txHash
+	const txHashHex = txHash ? bytesToHex(txHash) : 'simulation-no-txhash'
+	if (!txHash || txHashHex === '0x' || /^0x0+$/i.test(txHashHex)) {
+		runtime.log(
+			'Write report succeeded, but simulator did not return a real tx hash (expected in local simulate without full broadcast receipt).',
+		)
+		return 'simulation-no-txhash'
+	}
+
+	runtime.log(`Write report transaction succeeded at txHash: ${txHashHex}`)
+	return txHashHex
 }
 
 const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<string> => {
