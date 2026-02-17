@@ -1,0 +1,538 @@
+export const DiligencePortalABI = [
+  {
+    type: "function",
+    name: "submit",
+    inputs: [
+      { name: "subject", type: "address" },
+      { name: "docBundleHash", type: "bytes32" },
+      { name: "metadataUri", type: "string" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "getRequest",
+    inputs: [{ name: "requestId", type: "uint256" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "requester", type: "address" },
+          { name: "subject", type: "address" },
+          { name: "docBundleHash", type: "bytes32" },
+          { name: "metadataUri", type: "string" },
+          { name: "requestedAt", type: "uint64" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "nextRequestId",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "event",
+    name: "DiligenceRequested",
+    inputs: [
+      { name: "requestId", type: "uint256", indexed: true },
+      { name: "requester", type: "address", indexed: true },
+      { name: "subject", type: "address", indexed: true },
+      { name: "docBundleHash", type: "bytes32", indexed: false },
+      { name: "metadataUri", type: "string", indexed: false },
+      { name: "requestedAt", type: "uint64", indexed: false },
+    ],
+  },
+] as const;
+
+export const ComplianceRegistryABI = [
+  {
+    type: "function",
+    name: "isApproved",
+    inputs: [{ name: "subject", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getRecord",
+    inputs: [{ name: "subject", type: "address" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "approved", type: "bool" },
+          { name: "riskScore", type: "uint32" },
+          { name: "attestationHash", type: "bytes32" },
+          { name: "updatedAt", type: "uint64" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "workflowOperator",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "owner",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "setApproval",
+    inputs: [
+      { name: "subject", type: "address" },
+      { name: "approved", type: "bool" },
+      { name: "riskScore", type: "uint32" },
+      { name: "attestationHash", type: "bytes32" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "event",
+    name: "ComplianceUpdated",
+    inputs: [
+      { name: "subject", type: "address", indexed: true },
+      { name: "approved", type: "bool", indexed: false },
+      { name: "riskScore", type: "uint32", indexed: false },
+      { name: "attestationHash", type: "bytes32", indexed: false },
+      { name: "updatedAt", type: "uint64", indexed: false },
+    ],
+  },
+] as const;
+
+export const RWAVaultABI = [
+  {
+    type: "function",
+    name: "totalAssets",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "totalSupply",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "balanceOf",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "asset",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "deposit",
+    inputs: [
+      { name: "assets", type: "uint256" },
+      { name: "receiver", type: "address" },
+    ],
+    outputs: [{ name: "shares", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "withdraw",
+    inputs: [
+      { name: "assets", type: "uint256" },
+      { name: "receiver", type: "address" },
+      { name: "owner", type: "address" },
+    ],
+    outputs: [{ name: "shares", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "maxDeposit",
+    inputs: [{ name: "receiver", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "previewDeposit",
+    inputs: [{ name: "assets", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "convertToAssets",
+    inputs: [{ name: "shares", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "convertToShares",
+    inputs: [{ name: "assets", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "name",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "symbol",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "decimals",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "complianceRegistry",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+] as const;
+
+export const DemoUSDABI = [
+  {
+    type: "function",
+    name: "balanceOf",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "allowance",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "approve",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "value", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "decimals",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "totalSupply",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "mint",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "name",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "symbol",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+  },
+] as const;
+
+export const IdentityRegistryABI = [
+  {
+    type: "function",
+    name: "nextAgentId",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "ownerOf",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "tokenURI",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getAgentWallet",
+    inputs: [{ name: "agentId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getMetadata",
+    inputs: [
+      { name: "agentId", type: "uint256" },
+      { name: "metadataKey", type: "string" },
+    ],
+    outputs: [{ name: "", type: "bytes" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "register",
+    inputs: [{ name: "agentURI", type: "string" }],
+    outputs: [{ name: "agentId", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "event",
+    name: "Registered",
+    inputs: [
+      { name: "agentId", type: "uint256", indexed: true },
+      { name: "agentURI", type: "string", indexed: false },
+      { name: "owner", type: "address", indexed: true },
+    ],
+  },
+] as const;
+
+export const ReputationRegistryABI = [
+  {
+    type: "function",
+    name: "getIdentityRegistry",
+    inputs: [],
+    outputs: [{ name: "identityRegistry", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "readFeedback",
+    inputs: [
+      { name: "agentId", type: "uint256" },
+      { name: "clientAddress", type: "address" },
+      { name: "feedbackIndex", type: "uint64" },
+    ],
+    outputs: [
+      { name: "value", type: "int128" },
+      { name: "valueDecimals", type: "uint8" },
+      { name: "tag1", type: "string" },
+      { name: "tag2", type: "string" },
+      { name: "isRevoked", type: "bool" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getLastIndex",
+    inputs: [
+      { name: "agentId", type: "uint256" },
+      { name: "clientAddress", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint64" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getSummary",
+    inputs: [
+      { name: "agentId", type: "uint256" },
+      { name: "clientAddresses", type: "address[]" },
+      { name: "tag1", type: "string" },
+      { name: "tag2", type: "string" },
+    ],
+    outputs: [
+      { name: "count", type: "uint64" },
+      { name: "summaryValue", type: "int128" },
+      { name: "summaryValueDecimals", type: "uint8" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "giveFeedback",
+    inputs: [
+      { name: "agentId", type: "uint256" },
+      { name: "value", type: "int128" },
+      { name: "valueDecimals", type: "uint8" },
+      { name: "tag1", type: "string" },
+      { name: "tag2", type: "string" },
+      { name: "endpoint", type: "string" },
+      { name: "feedbackURI", type: "string" },
+      { name: "feedbackHash", type: "bytes32" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "event",
+    name: "NewFeedback",
+    inputs: [
+      { name: "agentId", type: "uint256", indexed: true },
+      { name: "clientAddress", type: "address", indexed: true },
+      { name: "feedbackIndex", type: "uint64", indexed: false },
+      { name: "value", type: "int128", indexed: false },
+      { name: "valueDecimals", type: "uint8", indexed: false },
+      { name: "indexedTag1", type: "string", indexed: true },
+      { name: "tag1", type: "string", indexed: false },
+      { name: "tag2", type: "string", indexed: false },
+      { name: "endpoint", type: "string", indexed: false },
+      { name: "feedbackURI", type: "string", indexed: false },
+      { name: "feedbackHash", type: "bytes32", indexed: false },
+    ],
+  },
+] as const;
+
+export const ValidationRegistryABI = [
+  {
+    type: "function",
+    name: "validationRequest",
+    inputs: [
+      { name: "validatorAddress", type: "address" },
+      { name: "agentId", type: "uint256" },
+      { name: "requestURI", type: "string" },
+      { name: "requestHash", type: "bytes32" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "validationResponse",
+    inputs: [
+      { name: "requestHash", type: "bytes32" },
+      { name: "response", type: "uint8" },
+      { name: "responseURI", type: "string" },
+      { name: "responseHash", type: "bytes32" },
+      { name: "tag", type: "string" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "getAgentValidations",
+    inputs: [{ name: "agentId", type: "uint256" }],
+    outputs: [{ name: "requestHashes", type: "bytes32[]" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getValidationStatus",
+    inputs: [{ name: "requestHash", type: "bytes32" }],
+    outputs: [
+      { name: "validatorAddress", type: "address" },
+      { name: "agentId", type: "uint256" },
+      { name: "response", type: "uint8" },
+      { name: "responseHash", type: "bytes32" },
+      { name: "tag", type: "string" },
+      { name: "lastUpdate", type: "uint256" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "event",
+    name: "ValidationResponse",
+    inputs: [
+      { name: "validatorAddress", type: "address", indexed: true },
+      { name: "agentId", type: "uint256", indexed: true },
+      { name: "requestHash", type: "bytes32", indexed: true },
+      { name: "response", type: "uint8", indexed: false },
+      { name: "responseURI", type: "string", indexed: false },
+      { name: "responseHash", type: "bytes32", indexed: false },
+      { name: "tag", type: "string", indexed: false },
+    ],
+  },
+] as const;
+
+export const RWAComplianceReceiverABI = [
+  {
+    type: "function",
+    name: "reputationAgentId",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "validationAgentId",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "forwarder",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "owner",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "event",
+    name: "ReportProcessed",
+    inputs: [
+      { name: "subject", type: "address", indexed: true },
+      { name: "approved", type: "bool", indexed: false },
+      { name: "riskScore", type: "uint32", indexed: false },
+      { name: "attestationHash", type: "bytes32", indexed: false },
+    ],
+  },
+] as const;

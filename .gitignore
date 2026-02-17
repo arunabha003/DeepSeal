@@ -14,3 +14,4 @@ cre/**/my-workflow/build/
 cre/**/my-workflow/test-out.*
 cre/**/my-workflow/cfg.json
 STATUS.d
+.next/

@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  @apply bg-surface-0 text-zinc-200 font-sans antialiased;
+}
+
+::selection {
+  @apply bg-accent/30 text-white;
+}
+
+input, textarea, select {
+  @apply bg-surface-2 border border-surface-4 rounded-md px-3 py-2 text-sm text-zinc-200
+         placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent
+         transition-colors;
+}
+
+button {
+  @apply transition-all duration-150;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-surface-0;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-surface-4 rounded-full;
+}
