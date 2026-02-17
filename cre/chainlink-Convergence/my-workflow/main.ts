@@ -398,11 +398,8 @@ const fetchGeminiRisk = (
 	config: Config,
 	apiKey: string,
 	prompt: string,
+	runtime: Runtime<Config>,
 ): RiskObservation => {
-	const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-		config.geminiModel,
-	)}:generateContent?key=${encodeURIComponent(apiKey)}`
-
 	const bodyBytes = new TextEncoder().encode(
 		JSON.stringify({
 			contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -414,17 +411,60 @@ const fetchGeminiRisk = (
 	)
 	const body = Buffer.from(bodyBytes).toString('base64')
 
-	const response = sendRequester
-		.sendRequest({
-			method: 'POST',
-			url,
-			headers: { 'content-type': 'application/json' },
-			body,
-		})
-		.result()
+	const toModelName = (raw: string): string => raw.replace(/^models\//, '').trim()
+	const buildGenerateUrl = (modelName: string): string =>
+		`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+			toModelName(modelName),
+		)}:generateContent?key=${encodeURIComponent(apiKey)}`
+
+	const doGenerateCall = (modelName: string) =>
+		sendRequester
+			.sendRequest({
+				method: 'POST',
+				url: buildGenerateUrl(modelName),
+				headers: { 'content-type': 'application/json' },
+				body,
+			})
+			.result()
+
+	let selectedModel = config.geminiModel
+	let response = doGenerateCall(selectedModel)
 
 	if (response.statusCode < 200 || response.statusCode >= 300) {
-		throw new Error(`Gemini HTTP request failed with status: ${response.statusCode} body=${decodeBodyUtf8(response.body)}`)
+		let errorBody = decodeBodyUtf8(response.body)
+		// Model names evolve quickly. If configured model is invalid, discover an available one and retry once.
+		if (response.statusCode === 404) {
+			const modelsResp = sendRequester
+				.sendRequest({
+					method: 'GET',
+					url: `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+				})
+				.result()
+			if (modelsResp.statusCode >= 200 && modelsResp.statusCode < 300) {
+				const list = safeJsonParse(decodeBodyUtf8(modelsResp.body))
+				const available: string[] = (list?.models || [])
+					.filter((m: any) => Array.isArray(m?.supportedGenerationMethods))
+					.filter((m: any) => m.supportedGenerationMethods.includes('generateContent'))
+					.map((m: any) => String(m?.name || '').replace(/^models\//, ''))
+					.filter((v: string) => v.length > 0)
+
+				const preferredMatchers = ['2.5-flash', '2.0-flash', '1.5-flash', 'flash', 'pro']
+				const fallback =
+					preferredMatchers
+						.map((match) => available.find((m) => m.includes(match)))
+						.find(Boolean) || available[0]
+
+				if (fallback) {
+					runtime.log(`Configured geminiModel=${config.geminiModel} unavailable. Retrying with model=${fallback}`)
+					selectedModel = fallback
+					response = doGenerateCall(selectedModel)
+					errorBody = decodeBodyUtf8(response.body)
+				}
+			}
+		}
+		if (response.statusCode < 200 || response.statusCode >= 300) {
+			throw new Error(`Gemini HTTP request failed with status: ${response.statusCode} body=${errorBody}`)
+		}
 	}
 
 	const jsonResp = safeJsonParse(decodeBodyUtf8(response.body)) as any
@@ -613,13 +653,13 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 
 	const apiKey = getRequiredSecret(runtime, 'GEMINI_API_KEY')
 
-	const geminiRisk = new HTTPClient()
-		.sendRequest(
-			runtime,
-			(sr: HTTPSendRequester, cfg: Config) => fetchGeminiRisk(sr, cfg, apiKey, prompt),
-			ConsensusAggregationByFields<RiskObservation>({
-				approved: identical,
-				riskScore: median,
+		const geminiRisk = new HTTPClient()
+			.sendRequest(
+				runtime,
+				(sr: HTTPSendRequester, cfg: Config) => fetchGeminiRisk(sr, cfg, apiKey, prompt, runtime),
+				ConsensusAggregationByFields<RiskObservation>({
+					approved: identical,
+					riskScore: median,
 				reasonsText: identical,
 			}),
 		)(runtime.config)
