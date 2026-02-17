@@ -122,12 +122,17 @@ const parseTriggerInput = (raw: string): any => {
 		if (/^[0-9]+$/.test(trimmed)) {
 			return { requestId: Number(trimmed) }
 		}
-		if (
+		// If input starts like JSON but parse failed, surface JSON parse error directly.
+		// This avoids misclassifying payloads that include URLs (e.g. https://...) as file paths.
+		if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+			throw new Error(`Invalid HTTP trigger JSON: ${e?.message || e}. Raw=${trimmed}`)
+		}
+		const looksLikePath =
 			trimmed.startsWith('./') ||
 			trimmed.startsWith('../') ||
-			trimmed.endsWith('.json') ||
-			trimmed.includes('/')
-		) {
+			trimmed.startsWith('/') ||
+			trimmed.endsWith('.json')
+		if (looksLikePath) {
 			throw new Error(
 				`HTTP trigger input looks like a file path (${trimmed}) but workflow received a raw string. Pass inline JSON (e.g. {"requestId":1}) or ensure CRE loads the file path correctly.`,
 			)
