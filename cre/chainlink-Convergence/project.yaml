@@ -29,6 +29,9 @@ anvil-e2e-settings:
     - chain-name: ethereum-testnet-sepolia-base-1
       # Anvil started with a Base Sepolia fork URL.
       url: http://127.0.0.1:8545
+    - chain-name: ethereum-mainnet
+      # Required by CRE secrets commands in some CLI builds.
+      url: https://ethereum-rpc.publicnode.com
 
 # ==========================================================================
 staging-settings:
