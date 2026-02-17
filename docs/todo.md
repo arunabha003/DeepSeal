@@ -23,7 +23,7 @@ This is the tracked to-do list for hackathon readiness (what still needs doing b
 ## Payments (x402)
 - [x] Enable x402 on the KYB provider (`services/kyb-provider/.env`: `X402_ENABLED=true`) with `POST /kyb` paywall.
 - [x] Enable workflow-side buyer retry (`x402Enabled=true` in CRE config + `X402_BUYER_PRIVATE_KEY` secret/config fallback).
-- [ ] Record a paid-call proof on your machine:
+- [x] Record a paid-call proof on your machine (Anvil fork):
   - first response is `402` with `accepts[]`
   - workflow retries with `X-PAYMENT`
   - provider returns `X-PAYMENT-RESPONSE`

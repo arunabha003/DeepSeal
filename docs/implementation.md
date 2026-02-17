@@ -60,5 +60,8 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
   - Mitigation for local demos: use config fallbacks (`geminiApiKey`, `x402BuyerPrivateKey`) in `config.anvil-e2e.json`.
 - In local simulation, `writeReport` may not expose a real tx hash (simulator can return empty/zero hash).
   - Validate success by reading `ComplianceRegistry.getRecord(subject)` after simulation.
+- On Anvil Base Sepolia forks, buyer/deployer addresses can carry EIP-7702 delegation code (`0xef01...`).
+  - This breaks USDC `transferWithAuthorization` / `permit` checks with `invalid signature`.
+  - Mitigation: clear code with `anvil_setCode(<address>, "0x")` before paid x402 runs (see `docs/anvil-base-sepolia-e2e.md`).
 - Validation side effect requires receiver authorization on the configured validation agent ID.
   - Default deploy script handles this via `identityRegistry.approve(address(receiver), validationAgentId)`.

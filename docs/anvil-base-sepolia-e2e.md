@@ -32,6 +32,33 @@ SUMSUB_LEVEL_NAME=...
 
 For free-path smoke tests only, set `X402_ENABLED=false` and keep workflow `kybUrl` on `/kyb/free`.
 
+## 2.5) Clear EIP-7702 delegation code from Anvil accounts
+
+On Base Sepolia, several well-known Anvil accounts have EIP-7702 delegation
+designators (`0xef01…`) deployed at their addresses. This causes the USDC
+`SignatureChecker` to treat them as **contracts** rather than EOAs, making
+`transferWithAuthorization` / `permit` fail with "invalid signature".
+
+Clear the code for the **actual buyer address** and deployer:
+
+```bash
+# Resolve buyer from your configured x402 buyer private key
+export X402_BUYER_PRIVATE_KEY=0x<your_x402_buyer_private_key>
+export BUYER_ADDRESS=$(cast wallet address --private-key "$X402_BUYER_PRIVATE_KEY")
+
+# Buyer
+curl -s -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"anvil_setCode","params":["'"$BUYER_ADDRESS"'","0x"],"id":1}' \
+  http://127.0.0.1:8545
+
+# Deployer / relayer – account #0
+curl -s -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"anvil_setCode","params":["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266","0x"],"id":2}' \
+  http://127.0.0.1:8545
+```
+
+Verify with `cast code <address> --rpc-url http://127.0.0.1:8545` — should return `0x`.
+
 ## 3) Deploy contracts to Anvil fork
 ```bash
 export RPC_URL=http://127.0.0.1:8545
@@ -111,9 +138,6 @@ EOF
 
 PAYLOAD=$(jq -c . ./http-payload.local.json)
 cre workflow simulate ./my-workflow --target anvil-e2e-settings --trigger-index 0 --http-payload "$PAYLOAD" --non-interactive -e .env
-
-# paid path (x402 + buyer retry)
-cre workflow simulate ./my-workflow --target staging-settings --trigger-index 0 --http-payload "$PAYLOAD" --non-interactive -e .env
 ```
 
 Notes:
