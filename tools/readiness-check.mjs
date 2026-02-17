@@ -14,6 +14,18 @@ function run(cmd, args) {
   return { ok: true, out: (r.stdout || "").trim() };
 }
 
+function isPrivateKeyHex(v) {
+  return /^0x[0-9a-fA-F]{64}$/.test(String(v || "").trim());
+}
+
+function deriveAddressFromPrivateKey(privateKey) {
+  if (!isPrivateKeyHex(privateKey)) return null;
+  const out = run("cast", ["wallet", "address", "--private-key", String(privateKey).trim()]);
+  if (!out.ok) return null;
+  const address = out.out.trim();
+  return /^0x[0-9a-fA-F]{40}$/.test(address) ? address : null;
+}
+
 function isZeroAddress(v) {
   return /^0x0{40}$/i.test(v);
 }
@@ -68,6 +80,30 @@ function main() {
 
   checkContractCode(cfg.diligencePortalAddress, rpcUrl, "DiligencePortal");
   checkContractCode(cfg.receiverAddress, rpcUrl, "RWAComplianceReceiver");
+
+  // Check for EIP-7702 delegation code on buyer/deployer accounts (Anvil fork issue)
+  if ((rpcUrl.includes("127.0.0.1") || rpcUrl.includes("localhost")) && Boolean(cfg.x402Enabled)) {
+    const buyerFromCfg = deriveAddressFromPrivateKey(cfg.x402BuyerPrivateKey);
+    const buyerFromEnv = deriveAddressFromPrivateKey(process.env.X402_BUYER_PRIVATE_KEY);
+    const buyerAddr = cfg.x402BuyerAddress || buyerFromCfg || buyerFromEnv;
+    const deployerAddr = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+    const checks = [["Deployer", deployerAddr]];
+    if (buyerAddr) checks.unshift(["Buyer", buyerAddr]);
+    for (const [label, addr] of checks) {
+      const code = run("cast", ["code", addr, "--rpc-url", rpcUrl]);
+      if (code.ok && code.out && code.out !== "0x") {
+        console.warn(`⚠️  ${label} (${addr}) has code on-chain (EIP-7702 delegation?).`);
+        console.warn(`   USDC SignatureChecker will treat it as a contract, not an EOA.`);
+        console.warn(`   Fix: curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"anvil_setCode","params":["${addr}","0x"],"id":1}' ${rpcUrl}`);
+        die(`${label} address has EIP-7702 delegation code — x402 signatures will fail. Clear it first.`);
+      }
+    }
+    if (!buyerAddr) {
+      console.log("- EIP-7702 check: deployer is clean EOA ✓ (buyer key not configured, buyer check skipped)");
+    } else {
+      console.log("- EIP-7702 check: buyer and deployer are clean EOAs ✓");
+    }
+  }
 
   const kyb = run("curl", ["-sf", `${cfg.kybUrl.replace(/\/kyb$/, "/healthz").replace(/\/kyb\/free$/, "/healthz")}`]);
   if (!kyb.ok) {

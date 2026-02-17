@@ -18,6 +18,11 @@ app.use(express.json({ limit: '2mb' }))
 const port = Number(process.env.PORT || 3001)
 const x402Enabled = String(process.env.X402_ENABLED || 'false').toLowerCase() === 'true'
 const x402Version = Number(process.env.X402_VERSION || 1)
+const x402Debug = String(process.env.X402_DEBUG || 'false').toLowerCase() === 'true'
+
+const x402Log = (...args) => {
+  if (x402Debug) console.log(...args)
+}
 
 const chainByX402Network = {
   'base-sepolia': baseSepolia,
@@ -405,7 +410,10 @@ app.post('/kyb', async (req, res) => {
 
     const { verifyClient, settleClient } = getX402Clients(paymentRequirements.network)
 
+    x402Log('[x402-debug] paymentRequirements.extra:', JSON.stringify(paymentRequirements.extra))
+    x402Log('[x402-debug] payload.network:', payload.network)
     const verifyResp = await verify(verifyClient, payload, paymentRequirements)
+    x402Log('[x402-debug] verifyResp:', JSON.stringify(verifyResp))
     if (!verifyResp?.isValid) {
       return res.status(402).json({
         x402Version,
@@ -416,6 +424,7 @@ app.post('/kyb', async (req, res) => {
     }
 
     const settleResp = await settle(settleClient, payload, paymentRequirements)
+    x402Log('[x402-debug] settleResp:', JSON.stringify(settleResp))
     if (!settleResp?.success) {
       return res.status(402).json({
         x402Version,
@@ -429,6 +438,7 @@ app.post('/kyb', async (req, res) => {
     const out = await sumsubVerify(req.body)
     return res.status(200).json(out)
   } catch (e) {
+    if (x402Debug) console.error('[x402-debug] SETTLE ERROR:', e?.message || e)
     return res.status(402).json({
       x402Version,
       accepts,

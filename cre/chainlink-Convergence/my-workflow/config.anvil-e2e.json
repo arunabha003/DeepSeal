@@ -3,10 +3,10 @@
   "diligencePortalAddress": "0x8071e429c7684fce0250287f1578397142503241",
   "receiverAddress": "0xb98e0fb673e5a0c6e15f1d0a9f36e7da954a0d5e",
   "gasLimit": "1000000",
-  "kybUrl": "http://127.0.0.1:3001/kyb/free",
+  "kybUrl": "http://127.0.0.1:3001/kyb",
   "geminiModel": "gemini-2.5-flash",
   "geminiApiKey": "",
   "x402BuyerPrivateKey": "",
   "useConfidentialHttp": false,
-  "x402Enabled": false
+  "x402Enabled": true
 }
