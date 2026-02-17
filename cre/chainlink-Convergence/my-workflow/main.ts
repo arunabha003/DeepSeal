@@ -187,7 +187,7 @@ type X402Accept = {
 	resource: string
 	payTo: string
 	asset: string
-	extra?: { name?: string; version?: string }
+	extra?: { name?: string; version?: string; chainId?: number | string }
 	maxTimeoutSeconds: number
 }
 
@@ -206,6 +206,53 @@ const x402ResponseSchema = z.object({
 		}),
 	),
 })
+
+const buildX402AcceptCandidates = (accept0: any, fallbackUrl: string): X402Accept[] => {
+	const base = {
+		scheme: 'exact' as const,
+		network: String(accept0.network),
+		maxAmountRequired: String(accept0.maxAmountRequired),
+		resource: String(accept0.resource || fallbackUrl),
+		payTo: String(accept0.payTo),
+		asset: String(accept0.asset),
+		maxTimeoutSeconds: Number(accept0.maxTimeoutSeconds || 120),
+	}
+
+	const rawExtra = (accept0.extra || {}) as any
+	const provided = {
+		name: typeof rawExtra.name === 'string' ? rawExtra.name : undefined,
+		version: typeof rawExtra.version === 'string' ? rawExtra.version : undefined,
+		chainId:
+			typeof rawExtra.chainId === 'string' || typeof rawExtra.chainId === 'number'
+				? rawExtra.chainId
+				: undefined,
+	}
+
+	const candidates = [
+		provided,
+		{ name: 'USD Coin', version: '2', chainId: provided.chainId },
+		{ name: 'USDC', version: '2', chainId: provided.chainId },
+		{ name: 'USD Coin', version: '1', chainId: provided.chainId },
+		{ name: 'USDC', version: '1', chainId: provided.chainId },
+	]
+
+	const seen = new Set<string>()
+	const out: X402Accept[] = []
+	for (const c of candidates) {
+		const key = `${c.name || ''}::${c.version || ''}::${String(c.chainId || '')}`
+		if (seen.has(key)) continue
+		seen.add(key)
+		out.push({
+			...base,
+			extra: {
+				name: c.name,
+				version: c.version,
+				chainId: c.chainId,
+			},
+		})
+	}
+	return out
+}
 
 const networkToChainId = (network: string): number => {
 	switch (network) {
@@ -237,7 +284,16 @@ const buildXPaymentHeaderExactEvm = (accept: X402Accept, buyerPrivateKey: `0x${s
 	const validBefore = now + timeout
 	const nonce = keccak256(toHex(`${nonceSeed}:${Date.now().toString()}`))
 
-	const chainId = networkToChainId(accept.network)
+	const chainIdRaw = accept.extra?.chainId
+	const chainId =
+		typeof chainIdRaw === 'number'
+			? chainIdRaw
+			: typeof chainIdRaw === 'string' && chainIdRaw.length > 0
+				? Number(chainIdRaw)
+				: networkToChainId(accept.network)
+	if (!Number.isFinite(chainId) || chainId <= 0) {
+		throw new Error(`Invalid x402 chainId: ${String(chainIdRaw)}`)
+	}
 	const domain = {
 		name: (accept.extra?.name as string) || 'USD Coin',
 		version: (accept.extra?.version as string) || '2',
@@ -328,39 +384,47 @@ const fetchKybHttp = (
 
 		const parsed402 = x402ResponseSchema.parse(safeJsonParse(decodeBodyUtf8(initial.body)))
 		const accept0 = parsed402.accepts[0] as any
-		const accept: X402Accept = {
-			scheme: 'exact',
-			network: accept0.network,
-			maxAmountRequired: accept0.maxAmountRequired,
-			resource: accept0.resource || config.kybUrl,
-			payTo: accept0.payTo,
-			asset: accept0.asset,
-			extra: (accept0.extra as any) || {},
-			maxTimeoutSeconds: accept0.maxTimeoutSeconds || 120,
+		const accepts = buildX402AcceptCandidates(accept0, config.kybUrl)
+		let lastErrorBody = ''
+
+		for (const accept of accepts) {
+			const xPayment = buildXPaymentHeaderExactEvm(accept, buyerPk, `kyb:${req.subject}:${req.docBundleHash}`)
+			const paid = sendRequester
+				.sendRequest({
+					method: 'POST',
+					url: config.kybUrl.replace(/\/kyb\/free$/, '/kyb'),
+					headers: { 'content-type': 'application/json', 'X-PAYMENT': xPayment },
+					body,
+				})
+				.result()
+
+			if (paid.statusCode >= 200 && paid.statusCode < 300) {
+				const parsed = safeJsonParse(decodeBodyUtf8(paid.body))
+				return {
+					providerStatus: parsed.providerStatus,
+					providerScore: parsed.providerScore,
+					providerResponseHash: parsed.providerResponseHash,
+					xPaymentResponseHeader: getHttpHeaderValue(
+						paid.headers as Record<string, string> | undefined,
+						'x-payment-response',
+					),
+				} as KYBResult
+			}
+
+			lastErrorBody = decodeBodyUtf8(paid.body)
+			const parsedError = safeJsonParse(lastErrorBody)
+			const detail = String(parsedError?.detail || '')
+			if (paid.statusCode === 402 && /invalid signature/i.test(detail)) {
+				runtime.log(
+					`x402 signature retry with alternate EIP712 domain failed for name=${accept.extra?.name || ''} version=${accept.extra?.version || ''}`,
+				)
+				continue
+			}
+
+			throw new Error(`KYB x402-paid request failed with status: ${paid.statusCode} body=${lastErrorBody}`)
 		}
 
-		const xPayment = buildXPaymentHeaderExactEvm(accept, buyerPk, `kyb:${req.subject}:${req.docBundleHash}`)
-
-		const paid = sendRequester
-			.sendRequest({
-				method: 'POST',
-				url: config.kybUrl.replace(/\/kyb\/free$/, '/kyb'),
-				headers: { 'content-type': 'application/json', 'X-PAYMENT': xPayment },
-				body,
-			})
-			.result()
-
-		if (paid.statusCode < 200 || paid.statusCode >= 300) {
-			throw new Error(`KYB x402-paid request failed with status: ${paid.statusCode} body=${decodeBodyUtf8(paid.body)}`)
-		}
-
-		const parsed = safeJsonParse(decodeBodyUtf8(paid.body))
-			return {
-				providerStatus: parsed.providerStatus,
-				providerScore: parsed.providerScore,
-				providerResponseHash: parsed.providerResponseHash,
-				xPaymentResponseHeader: getHttpHeaderValue(paid.headers as Record<string, string> | undefined, 'x-payment-response'),
-			} as KYBResult
+		throw new Error(`KYB x402-paid request failed with status: 402 body=${lastErrorBody}`)
 	}
 
 	if (initial.statusCode < 200 || initial.statusCode >= 300) {
@@ -407,49 +471,54 @@ const fetchKybConfidential = (
 
 		const parsed402 = x402ResponseSchema.parse(safeJsonParse(decodeBodyUtf8(initial.body)))
 		const accept0 = parsed402.accepts[0] as any
-		const accept: X402Accept = {
-			scheme: 'exact',
-			network: accept0.network,
-			maxAmountRequired: accept0.maxAmountRequired,
-			resource: accept0.resource || config.kybUrl,
-			payTo: accept0.payTo,
-			asset: accept0.asset,
-			extra: (accept0.extra as any) || {},
-			maxTimeoutSeconds: accept0.maxTimeoutSeconds || 120,
-		}
+		const accepts = buildX402AcceptCandidates(accept0, config.kybUrl)
+		let lastErrorBody = ''
 
-		const xPayment = buildXPaymentHeaderExactEvm(accept, buyerPk, `kyb:${req.subject}:${req.docBundleHash}`)
-
-		const paid = sendRequester
-			.sendRequest({
-				vaultDonSecrets: [],
-				encryptOutput: false,
-				request: {
-					method: 'POST',
-					url: config.kybUrl.replace(/\/kyb\/free$/, '/kyb'),
-					bodyString,
-					multiHeaders: {
-						'content-type': { values: ['application/json'] },
-						'X-PAYMENT': { values: [xPayment] },
+		for (const accept of accepts) {
+			const xPayment = buildXPaymentHeaderExactEvm(accept, buyerPk, `kyb:${req.subject}:${req.docBundleHash}`)
+			const paid = sendRequester
+				.sendRequest({
+					vaultDonSecrets: [],
+					encryptOutput: false,
+					request: {
+						method: 'POST',
+						url: config.kybUrl.replace(/\/kyb\/free$/, '/kyb'),
+						bodyString,
+						multiHeaders: {
+							'content-type': { values: ['application/json'] },
+							'X-PAYMENT': { values: [xPayment] },
+						},
 					},
-				},
-			})
-			.result()
+				})
+				.result()
 
-		if (paid.statusCode < 200 || paid.statusCode >= 300) {
-			throw new Error(`KYB x402-paid confidential request failed with status: ${paid.statusCode} body=${decodeBodyUtf8(paid.body)}`)
+			if (paid.statusCode >= 200 && paid.statusCode < 300) {
+				const parsed = safeJsonParse(decodeBodyUtf8(paid.body))
+				return {
+					providerStatus: parsed.providerStatus,
+					providerScore: parsed.providerScore,
+					providerResponseHash: parsed.providerResponseHash,
+					xPaymentResponseHeader: getConfidentialHeaderValue(
+						paid.multiHeaders as Record<string, { values?: string[] }> | undefined,
+						'x-payment-response',
+					),
+				} as KYBResult
+			}
+
+			lastErrorBody = decodeBodyUtf8(paid.body)
+			const parsedError = safeJsonParse(lastErrorBody)
+			const detail = String(parsedError?.detail || '')
+			if (paid.statusCode === 402 && /invalid signature/i.test(detail)) {
+				runtime.log(
+					`x402 confidential signature retry failed for name=${accept.extra?.name || ''} version=${accept.extra?.version || ''}`,
+				)
+				continue
+			}
+
+			throw new Error(`KYB x402-paid confidential request failed with status: ${paid.statusCode} body=${lastErrorBody}`)
 		}
 
-		const parsed = safeJsonParse(decodeBodyUtf8(paid.body))
-		return {
-			providerStatus: parsed.providerStatus,
-			providerScore: parsed.providerScore,
-			providerResponseHash: parsed.providerResponseHash,
-			xPaymentResponseHeader: getConfidentialHeaderValue(
-				paid.multiHeaders as Record<string, { values?: string[] }> | undefined,
-				'x-payment-response',
-			),
-		} as KYBResult
+		throw new Error(`KYB x402-paid confidential request failed with status: 402 body=${lastErrorBody}`)
 	}
 
 	if (initial.statusCode < 200 || initial.statusCode >= 300) {
