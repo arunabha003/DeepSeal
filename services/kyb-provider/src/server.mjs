@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'
 import crypto from 'node:crypto'
 import express from 'express'
-import { createWalletClient, http, isAddress, publicActions } from 'viem'
+import { createPublicClient, createWalletClient, http, isAddress, publicActions } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { avalanche, avalancheFuji, base, baseSepolia, polygon, polygonAmoy } from 'viem/chains'
 
@@ -63,6 +63,39 @@ const getX402Clients = (network) => {
   const transport = http(rpcUrl)
   const client = createWalletClient({ chain, transport, account: relayerAccount }).extend(publicActions)
   return { verifyClient: client, settleClient: client, relayer: relayerAccount.address, rpcUrl }
+}
+
+const getX402PublicClient = (network) => {
+  const chain = chainByX402Network[network]
+  if (!chain) throw new Error(`Unsupported X402 network: ${network}`)
+  return createPublicClient({ chain, transport: http(getX402RpcUrl(network)) })
+}
+
+const resolveAssetEip712 = async (network, assetAddress, fallback) => {
+  const overrideName = String(process.env.X402_EIP712_NAME || '').trim()
+  const overrideVersion = String(process.env.X402_EIP712_VERSION || '').trim()
+  if (overrideName && overrideVersion) {
+    return { name: overrideName, version: overrideVersion }
+  }
+
+  try {
+    const client = getX402PublicClient(network)
+    const abi = [
+      { name: 'name', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
+      { name: 'version', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
+    ]
+    const [name, version] = await Promise.all([
+      client.readContract({ address: assetAddress, abi, functionName: 'name' }),
+      client.readContract({ address: assetAddress, abi, functionName: 'version' }),
+    ])
+    if (typeof name === 'string' && name && typeof version === 'string' && version) {
+      return { name, version }
+    }
+  } catch {
+    // Fallback to packaged defaults below.
+  }
+
+  return fallback
 }
 
 const sumsubEnabled =
@@ -165,7 +198,7 @@ const getRequiredIdDocsStatus = async ({ applicantId }) => {
   return r.json
 }
 
-const toPaymentRequirements = (req) => {
+const toPaymentRequirements = async (req) => {
   const payTo = mustEnv('X402_PAY_TO')
   if (!isAddress(payTo)) {
     const looksLikePrivateKey = /^0x[0-9a-fA-F]{64}$/.test(payTo)
@@ -186,6 +219,8 @@ const toPaymentRequirements = (req) => {
   if (error) throw new Error(error)
 
   const defaultAsset = getDefaultAsset(network)
+  const resolvedAsset = asset?.address || defaultAsset.address
+  const resolvedEip712 = await resolveAssetEip712(network, resolvedAsset, asset?.eip712 || defaultAsset.eip712)
 
   return [
     {
@@ -197,8 +232,8 @@ const toPaymentRequirements = (req) => {
       mimeType: 'application/json',
       payTo,
       maxTimeoutSeconds: timeout,
-      asset: asset?.address || defaultAsset.address,
-      extra: asset?.eip712 || defaultAsset.eip712,
+      asset: resolvedAsset,
+      extra: resolvedEip712,
     },
   ]
 }
@@ -305,7 +340,7 @@ app.post('/kyb', async (req, res) => {
     }
   }
 
-  const accepts = toPaymentRequirements(req)
+  const accepts = await toPaymentRequirements(req)
   const paymentHeader = req.header('X-PAYMENT')
 
   if (!paymentHeader) {
