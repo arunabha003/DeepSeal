@@ -79,6 +79,12 @@ If `cre secrets` fails due `owner not linked`, set local fallback keys directly 
 - `geminiApiKey`
 - `x402BuyerPrivateKey` (only needed when `x402Enabled=true`)
 
+Recommended helper (copies from `cre/chainlink-Convergence/.env`):
+```bash
+cd /Users/arunabha003/Documents/Projects/Chainlink-Converegence
+node tools/sync-local-secrets-to-config.mjs
+```
+
 ## 8) Preflight checks
 ```bash
 cd /Users/arunabha003/Documents/Projects/Chainlink-Converegence
