@@ -351,6 +351,10 @@ const fetchGeminiRisk = (
 	const bodyBytes = new TextEncoder().encode(
 		JSON.stringify({
 			contents: [{ role: 'user', parts: [{ text: prompt }] }],
+			generationConfig: {
+				responseMimeType: 'application/json',
+				temperature: 0,
+			},
 		}),
 	)
 	const body = Buffer.from(bodyBytes).toString('base64')
@@ -374,12 +378,30 @@ const fetchGeminiRisk = (
 			.map((p: any) => (typeof p?.text === 'string' ? p.text : ''))
 			.join('') || ''
 
-	let risk: RiskJson
-	try {
-		risk = JSON.parse(outText) as RiskJson
-	} catch {
-		throw new Error(`Gemini did not return strict JSON. Got: ${outText}`)
+	const parseRiskJson = (raw: string): RiskJson => {
+		const trimmed = raw.trim()
+		const attempts: string[] = [trimmed]
+		if (trimmed.startsWith('```')) {
+			const noFence = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim()
+			attempts.push(noFence)
+		}
+		const firstObj = trimmed.indexOf('{')
+		const lastObj = trimmed.lastIndexOf('}')
+		if (firstObj >= 0 && lastObj > firstObj) {
+			attempts.push(trimmed.slice(firstObj, lastObj + 1))
+		}
+
+		for (const candidate of attempts) {
+			try {
+				return JSON.parse(candidate) as RiskJson
+			} catch {
+				// try next shape
+			}
+		}
+		throw new Error(`Gemini did not return parseable JSON. Got: ${raw}`)
 	}
+
+	const risk = parseRiskJson(outText)
 
 	if (typeof risk.approved !== 'boolean') throw new Error('risk.approved must be boolean')
 	if (typeof risk.riskScore !== 'number') throw new Error('risk.riskScore must be number')
