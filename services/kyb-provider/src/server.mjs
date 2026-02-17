@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'
 import crypto from 'node:crypto'
 import express from 'express'
-import { createPublicClient, createWalletClient, http, isAddress } from 'viem'
+import { createWalletClient, http, isAddress, publicActions } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { avalanche, avalancheFuji, base, baseSepolia, polygon, polygonAmoy } from 'viem/chains'
 
@@ -61,9 +61,8 @@ const getX402Clients = (network) => {
   const rpcUrl = getX402RpcUrl(network)
   const relayerAccount = privateKeyToAccount(getX402RelayerPrivateKey())
   const transport = http(rpcUrl)
-  const verifyClient = createPublicClient({ chain, transport })
-  const settleClient = createWalletClient({ chain, transport, account: relayerAccount })
-  return { verifyClient, settleClient, relayer: relayerAccount.address, rpcUrl }
+  const client = createWalletClient({ chain, transport, account: relayerAccount }).extend(publicActions)
+  return { verifyClient: client, settleClient: client, relayer: relayerAccount.address, rpcUrl }
 }
 
 const sumsubEnabled =
