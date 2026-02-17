@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'
 import crypto from 'node:crypto'
 import express from 'express'
-import { createPublicClient, createWalletClient, http, isAddress, publicActions } from 'viem'
+import { createPublicClient, createWalletClient, hashDomain, http, isAddress, publicActions } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { avalanche, avalancheFuji, base, baseSepolia, polygon, polygonAmoy } from 'viem/chains'
 
@@ -78,23 +78,67 @@ const resolveAssetEip712 = async (network, assetAddress, fallback) => {
     return { name: overrideName, version: overrideVersion }
   }
 
+  const chain = chainByX402Network[network]
+  if (!chain) throw new Error(`Unsupported X402 network: ${network}`)
+
+  let onchainName = ''
+  let onchainVersion = ''
+  let onchainDomainSeparator = ''
+
   try {
     const client = getX402PublicClient(network)
     const abi = [
       { name: 'name', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
       { name: 'version', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
+      { name: 'DOMAIN_SEPARATOR', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'bytes32' }] },
     ]
-    const [name, version] = await Promise.all([
-      client.readContract({ address: assetAddress, abi, functionName: 'name' }),
-      client.readContract({ address: assetAddress, abi, functionName: 'version' }),
+    const [name, version, domainSeparator] = await Promise.all([
+      client.readContract({ address: assetAddress, abi, functionName: 'name' }).catch(() => ''),
+      client.readContract({ address: assetAddress, abi, functionName: 'version' }).catch(() => ''),
+      client.readContract({ address: assetAddress, abi, functionName: 'DOMAIN_SEPARATOR' }).catch(() => ''),
     ])
-    if (typeof name === 'string' && name && typeof version === 'string' && version) {
-      return { name, version }
-    }
+    onchainName = typeof name === 'string' ? name : ''
+    onchainVersion = typeof version === 'string' ? version : ''
+    onchainDomainSeparator = typeof domainSeparator === 'string' ? domainSeparator.toLowerCase() : ''
   } catch {
-    // Fallback to packaged defaults below.
+    // Use candidates below.
   }
 
+  const seen = new Set()
+  const candidates = [
+    onchainName && onchainVersion ? { name: onchainName, version: onchainVersion } : null,
+    fallback || null,
+    { name: 'USD Coin', version: '2' },
+    { name: 'USDC', version: '2' },
+    { name: 'USD Coin', version: '1' },
+    { name: 'USDC', version: '1' },
+  ]
+    .filter(Boolean)
+    .filter((c) => {
+      const key = `${c.name}::${c.version}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+
+  if (onchainDomainSeparator && /^0x[0-9a-fA-F]{64}$/.test(onchainDomainSeparator)) {
+    for (const candidate of candidates) {
+      const sep = hashDomain({
+        name: candidate.name,
+        version: candidate.version,
+        chainId: chain.id,
+        verifyingContract: assetAddress,
+      }).toLowerCase()
+      if (sep === onchainDomainSeparator) {
+        return candidate
+      }
+    }
+    throw new Error(
+      `Could not match EIP-712 domain for asset ${assetAddress}. Onchain DOMAIN_SEPARATOR=${onchainDomainSeparator}. Set X402_EIP712_NAME and X402_EIP712_VERSION explicitly.`,
+    )
+  }
+
+  if (onchainName && onchainVersion) return { name: onchainName, version: onchainVersion }
   return fallback
 }
 
