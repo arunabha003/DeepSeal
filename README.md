@@ -7,13 +7,14 @@ ERC‑4626 vault gated by an onchain compliance registry, intended to be driven 
 - `src/RWAVault.sol`: ERC‑4626 vault that blocks `deposit/mint` unless **both** caller and receiver are approved in `ComplianceRegistry`.
 - `src/DemoUSD.sol`: demo underlying ERC‑20 (6 decimals) for local/testnet demos.
 - `src/erc8004/*`: ERC‑8004 Identity/Reputation/Validation registries (agent reputation primitives).
-- `script/Deploy.s.sol`: deploys `DemoUSD`, `ComplianceRegistry`, `RWAVault`, plus ERC‑8004 registries.
+- `script/Deploy.s.sol`: deploys protocol + ERC‑8004 registries, auto-registers reputation/validation agents, and wires receiver-side ERC‑8004 automation.
 - `script/Configure.s.sol`: manually sets approval on the registry (useful until CRE workflow is wired).
 - ERC‑8004 helper scripts:
   - `script/AgentRegister.s.sol`
   - `script/GiveFeedback.s.sol`
   - `script/RequestValidation.s.sol`
   - `script/RespondValidation.s.sol`
+  - `script/ReadERC8004State.s.sol`
 
 ## Build & test
 ```bash
@@ -41,7 +42,7 @@ export CRE_REPORT_FORWARDER=0x0000000000000000000000000000000000000000 # optiona
 forge script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadcast
 ```
 
-## Manual approve (until CRE is wired)
+## Manual approve (break-glass only)
 ```bash
 export PRIVATE_KEY=0xYOUR_KEY
 export REGISTRY_ADDRESS=0x...
@@ -82,6 +83,7 @@ node tools/process-request.mjs
 Notes:
 - CRE workflow configs default `kybUrl` to `http://127.0.0.1:3001/kyb/free`.
 - To enable x402 on `POST /kyb`, set `X402_ENABLED=true` and `X402_PAY_TO=<your wallet address>` in `services/kyb-provider/.env` (see `.env.example`). Clients pay by sending an `X-PAYMENT` header; the server responds with `X-PAYMENT-RESPONSE` on success.
+- Workflow x402 buyer retry is implemented for both standard HTTP and Confidential HTTP paths.
 - Sumsub setup details: `docs/sumsub-setup.md`.
 
 ## EAS (optional audit trail)

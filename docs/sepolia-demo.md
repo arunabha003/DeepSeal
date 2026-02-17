@@ -6,8 +6,8 @@ End-to-end path:
 1) deploy contracts
 2) submit diligence request (onchain)
 3) run Sumsub-backed KYB provider locally
-4) simulate CRE workflow with HTTP trigger (Gemini + Sumsub KYB) and broadcast the onchain `writeReport`
-5) verify registry updated and vault deposit succeeds
+4) simulate CRE workflow with HTTP trigger (Gemini + Sumsub KYB + x402 buyer retry as needed) and broadcast the onchain `writeReport`
+5) verify registry updated, vault deposit succeeds, and ERC-8004 side effects are recorded
 
 ## 1) Deploy contracts
 ```bash
@@ -31,6 +31,8 @@ Record the deployed addresses printed by the script:
 - `ERC8004 IdentityRegistry`
 - `ERC8004 ReputationRegistry`
 - `ERC8004 ValidationRegistry`
+- `ERC8004 ReputationAgentId`
+- `ERC8004 ValidationAgentId`
 
 ## 2) Submit an onchain diligence request
 ```bash
@@ -73,9 +75,9 @@ Edit:
   - `diligencePortalAddress`
   - `receiverAddress`
   - `kybUrl` (`/kyb/free` for free mode, `/kyb` for paid mode)
-  - Optional:
-    - `useConfidentialHttp` (set true only if your CRE environment supports Confidential HTTP)
-    - `x402Enabled` (false for free mode, true for paid `POST /kyb`)
+- Optional:
+  - `useConfidentialHttp` (set true only if your CRE environment supports Confidential HTTP)
+  - `x402Enabled` (false for free mode, true for paid `POST /kyb`)
 
 Create `cre/chainlink-Convergence/.env` from `cre/chainlink-Convergence/.env.example`:
 - `CRE_ETH_PRIVATE_KEY` (same key as above)
@@ -121,10 +123,23 @@ Attempt a vault deposit (should revert before approval, succeed after):
 ```bash
 export VAULT_ADDRESS='0x...'
 export ASSET_ADDRESS='0x...'
+export RECEIVER_ADDRESS='0x...'
+export REPUTATION_REGISTRY='0x...'
+export VALIDATION_REGISTRY='0x...'
+export REPUTATION_AGENT_ID='...'
+export VALIDATION_AGENT_ID='...'
 
 # Approve spending
 cast send "$ASSET_ADDRESS" "approve(address,uint256)(bool)" "$VAULT_ADDRESS" 1000000 --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL"
 
 # Deposit
 cast send "$VAULT_ADDRESS" "deposit(uint256,address)(uint256)" 1000000 "$SUBJECT" --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL"
+```
+
+Verify ERC-8004 updates written by receiver:
+```bash
+cast call "$RECEIVER_ADDRESS" "reputationAgentId()(uint256)" --rpc-url "$RPC_URL"
+cast call "$RECEIVER_ADDRESS" "validationAgentId()(uint256)" --rpc-url "$RPC_URL"
+cast call "$REPUTATION_REGISTRY" "getLastIndex(uint256,address)(uint64)" "$REPUTATION_AGENT_ID" "$RECEIVER_ADDRESS" --rpc-url "$RPC_URL"
+cast call "$VALIDATION_REGISTRY" "getAgentValidations(uint256)(bytes32[])" "$VALIDATION_AGENT_ID" --rpc-url "$RPC_URL"
 ```

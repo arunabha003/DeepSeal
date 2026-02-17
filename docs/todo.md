@@ -21,24 +21,25 @@ This is the tracked to-do list for hackathon readiness (what still needs doing b
    - capture `EASAttested(subject, uid)` event from the `RWAComplianceReceiver` tx
 
 ## Payments (x402)
-- Enable x402 on the KYB provider (`services/kyb-provider/.env`: `X402_ENABLED=true`) and verify `POST /kyb` returns 402 until paid.
-- Enable workflow-side buyer retry (`x402Enabled=true` in CRE config + `X402_BUYER_PRIVATE_KEY` secret).
- - Record a paid-call proof:
-  - 402 response includes `accepts[]`
-  - client retries with `X-PAYMENT`
-  - server returns `X-PAYMENT-RESPONSE`
+- [x] Enable x402 on the KYB provider (`services/kyb-provider/.env`: `X402_ENABLED=true`) with `POST /kyb` paywall.
+- [x] Enable workflow-side buyer retry (`x402Enabled=true` in CRE config + `X402_BUYER_PRIVATE_KEY` secret/config fallback).
+- [ ] Record a paid-call proof on your machine:
+  - first response is `402` with `accepts[]`
+  - workflow retries with `X-PAYMENT`
+  - provider returns `X-PAYMENT-RESPONSE`
 
 ## Privacy (Confidential HTTP)
 - Switch the workflow to use Confidential HTTP (`useConfidentialHttp=true`) once your CRE environment supports it for the target.
 - Confirm the workflow still produces the same result while keeping KYB payloads off the public runner.
 
 ## Agents (ERC-8004)
-- Decide the “diligence agent” identity:
-  - register agent via `script/AgentRegister.s.sol`
-  - store `agentId` + metadata (URI) used in the demo
-- Record at least one:
-  - reputation feedback via `script/GiveFeedback.s.sol`, and/or
-  - validation request/response via `script/RequestValidation.s.sol` + `script/RespondValidation.s.sol`
+- [x] Auto-register ERC-8004 diligence agents during deploy (`script/Deploy.s.sol`).
+- [x] Auto-wire receiver for ERC-8004 writes:
+  - reputation feedback on each report
+  - validation request + auto-response on each report
+- [ ] Capture Base Sepolia proof run:
+  - non-empty `getLastIndex(reputationAgentId, receiver)`
+  - non-empty `getAgentValidations(validationAgentId)`
 
 ## Hardening / polish (optional)
 - Pin `RWAComplianceReceiver` expected workflow identity fields once the workflow is deployed.

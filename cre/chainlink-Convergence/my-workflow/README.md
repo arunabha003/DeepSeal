@@ -6,6 +6,8 @@ This workflow processes an onchain diligence request stored in `DiligencePortal`
 3) calling Gemini for a strict JSON risk decision
 4) writing the decision onchain via `EVMClient.writeReport` to `RWAComplianceReceiver`
 
+`RWAComplianceReceiver` then updates `ComplianceRegistry` and (if configured onchain) performs EAS + ERC-8004 side effects.
+
 ## 1) Configure RPCs
 `../project.yaml` contains RPCs used by local simulation. Default is a public Sepolia RPC.
 
@@ -27,6 +29,13 @@ Then edit the selected file:
    - `useConfidentialHttp` (explicit Confidential HTTP client)
    - `x402Enabled` (should match whether KYB is paywalled on `POST /kyb`)
    - `geminiApiKey` / `x402BuyerPrivateKey` (local simulation fallback when CRE secrets are not linked)
+
+## x402 + Confidential HTTP
+- x402 buyer retries are implemented for both HTTP client paths.
+- For paid mode, set:
+  - workflow `kybUrl` to `/kyb`
+  - `x402Enabled=true`
+  - `X402_BUYER_PRIVATE_KEY` in CRE secret manager or config fallback
 
 ## 4) Run KYB provider (local)
 In repo root:

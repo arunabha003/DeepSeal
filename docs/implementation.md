@@ -19,8 +19,13 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
   - `src/erc8004/ReputationRegistry.sol`
   - `src/erc8004/ValidationRegistry.sol`
   - helper scripts in `script/*Validation*.s.sol`, `script/AgentRegister.s.sol`, `script/GiveFeedback.s.sol`
+- ERC-8004 workflow-side automation:
+  - `src/RWAComplianceReceiver.sol` writes reputation feedback + validation request/response per processed report
+  - `script/Deploy.s.sol` auto-registers two agent IDs (reputation + validation), configures receiver, and approves receiver for validation agent
 - x402-ready KYB provider (seller/paywall) with free route for CRE simulation:
   - `services/kyb-provider/src/server.mjs`
+- x402 buyer retries for both HTTP and Confidential HTTP workflow paths:
+  - `cre/chainlink-Convergence/my-workflow/main.ts`
 - Sumsub (Sandbox) KYB integration (real provider API):
   - `docs/sumsub-setup.md`
 - Automated EAS attestations (optional) on each report:
@@ -43,7 +48,7 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
   - `cre/chainlink-Convergence/my-workflow/config.staging.json`
 - Run and record the full demo:
   - submit request → simulate workflow → registry updated → vault deposit succeeds
-- Optional: enable x402 on the KYB provider and add a paid-call demo (buyer wallet + USDC) or enable `x402Enabled=true` in the CRE workflow config.
+- Run and record paid x402 proof (402 challenge -> buyer retry with `X-PAYMENT` -> 200 success).
 - Optional hardening: enforce workflow identity pinning + forwarder in production deployment.
 
 ## Known issues / fixes
@@ -55,3 +60,5 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
   - Mitigation for local demos: use config fallbacks (`geminiApiKey`, `x402BuyerPrivateKey`) in `config.anvil-e2e.json`.
 - In local simulation, `writeReport` may not expose a real tx hash (simulator can return empty/zero hash).
   - Validate success by reading `ComplianceRegistry.getRecord(subject)` after simulation.
+- Validation side effect requires receiver authorization on the configured validation agent ID.
+  - Default deploy script handles this via `identityRegistry.approve(address(receiver), validationAgentId)`.
