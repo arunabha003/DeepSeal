@@ -43,6 +43,8 @@ const configSchema = z.object({
 	gasLimit: z.string(),
 	kybUrl: z.string(),
 	geminiModel: z.string(),
+	geminiApiKey: z.string().optional(),
+	x402BuyerPrivateKey: z.string().optional(),
 	useConfidentialHttp: z.boolean().optional(),
 	x402Enabled: z.boolean().optional(),
 })
@@ -89,7 +91,20 @@ type RiskObservation = {
 	reasonsText: string
 }
 
+const getOptionalConfigSecret = (runtime: Runtime<Config>, id: string): string => {
+	if (id === 'GEMINI_API_KEY') {
+		return String(runtime.config.geminiApiKey || '').trim()
+	}
+	if (id === 'X402_BUYER_PRIVATE_KEY') {
+		return String(runtime.config.x402BuyerPrivateKey || '').trim()
+	}
+	return ''
+}
+
 const getRequiredSecret = (runtime: Runtime<Config>, id: string): string => {
+	const cfgValue = getOptionalConfigSecret(runtime, id)
+	if (cfgValue) return cfgValue
+
 	try {
 		const secret = runtime.getSecret({ id }).result()
 		const value = typeof secret?.value === 'string' ? secret.value.trim() : String(secret?.value || '').trim()
@@ -99,7 +114,7 @@ const getRequiredSecret = (runtime: Runtime<Config>, id: string): string => {
 		return value
 	} catch (e: any) {
 		throw new Error(
-			`Missing secret: ${id}. Pass -e .env when simulating locally (from cre/chainlink-Convergence) or set it in CRE secrets manager. Cause: ${e?.message || e}`,
+			`Missing secret: ${id}. Set ${id} in CRE secrets manager or provide fallback in workflow config (geminiApiKey/x402BuyerPrivateKey) for local simulation. Cause: ${e?.message || e}`,
 		)
 	}
 }

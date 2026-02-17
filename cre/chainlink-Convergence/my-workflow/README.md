@@ -26,6 +26,7 @@ Then edit the selected file:
  - Optional:
    - `useConfidentialHttp` (explicit Confidential HTTP client)
    - `x402Enabled` (should match whether KYB is paywalled on `POST /kyb`)
+   - `geminiApiKey` / `x402BuyerPrivateKey` (local simulation fallback when CRE secrets are not linked)
 
 ## 4) Run KYB provider (local)
 In repo root:

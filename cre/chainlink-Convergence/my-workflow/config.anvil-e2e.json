@@ -1,10 +1,12 @@
 {
   "chainSelectorName": "ethereum-testnet-sepolia-base-1",
-  "diligencePortalAddress": "0x0000000000000000000000000000000000000000",
-  "receiverAddress": "0x0000000000000000000000000000000000000000",
+  "diligencePortalAddress": "0x8071e429c7684fce0250287f1578397142503241",
+  "receiverAddress": "0xb98e0fb673e5a0c6e15f1d0a9f36e7da954a0d5e",
   "gasLimit": "1000000",
   "kybUrl": "http://127.0.0.1:3001/kyb/free",
   "geminiModel": "gemini-1.5-flash",
+  "geminiApiKey": "",
+  "x402BuyerPrivateKey": "",
   "useConfidentialHttp": false,
   "x402Enabled": false
 }

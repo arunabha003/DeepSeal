@@ -32,7 +32,7 @@ SUMSUB_LEVEL_NAME=...
 ## 3) Deploy contracts to Anvil fork
 ```bash
 export RPC_URL=http://127.0.0.1:8545
-export PRIVATE_KEY=0x<anvil_account_0_private_key>
+export PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 forge script script/Deploy.s.sol:Deploy --rpc-url "$RPC_URL" --broadcast
 ```
@@ -46,7 +46,7 @@ node tools/sync-cre-config.mjs --chain-id 84532 --config cre/chainlink-Convergen
 ```bash
 export PORTAL_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="DiligencePortal") | .contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
 
-export SUBJECT=0x<anvil_account_1_address>
+export SUBJECT=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 export DOC_BUNDLE_HASH=0x1111111111111111111111111111111111111111111111111111111111111111
 export METADATA_URI=ipfs://rwa-docs/acme
 
@@ -73,6 +73,11 @@ GEMINI_API_KEY=<your_gemini_key>
 # optional for paid x402 path later
 X402_BUYER_PRIVATE_KEY=0x<base_sepolia_funded_buyer_key>
 ```
+
+If `cre secrets` fails due `owner not linked`, set local fallback keys directly in
+`cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json`:
+- `geminiApiKey`
+- `x402BuyerPrivateKey` (only needed when `x402Enabled=true`)
 
 ## 8) Preflight checks
 ```bash
