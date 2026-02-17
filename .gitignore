@@ -8,4 +8,9 @@ plan.md
 STATUS.md
 **/node_modules/
 cre/**/tmp.*
+cre/**/http-payload.local.json
+cre/**/http-test.json
+cre/**/my-workflow/build/
+cre/**/my-workflow/test-out.*
+cre/**/my-workflow/cfg.json
 STATUS.d

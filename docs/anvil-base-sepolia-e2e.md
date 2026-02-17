@@ -106,13 +106,13 @@ cat > http-payload.local.json <<'EOF'
 }
 EOF
 
-cre workflow simulate ./my-workflow \
-  --target anvil-e2e-settings \
-  --trigger-index 0 \
-  --http-payload ./http-payload.local.json \
-  --non-interactive \
-  -e .env
+PAYLOAD=$(jq -c . ./http-payload.local.json)
+cre workflow simulate ./my-workflow --target anvil-e2e-settings --trigger-index 0 --http-payload "$PAYLOAD" --non-interactive -e .env
 ```
+
+Notes:
+- Passing compact inline JSON (`$PAYLOAD`) avoids CLI path parsing quirks seen with `--http-payload ./file.json`.
+- If you see `Configured geminiModel=... unavailable. Retrying with model=...`, that fallback is expected.
 
 ## 10) Verify protocol outcome onchain
 ```bash
@@ -121,6 +121,7 @@ export VAULT_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="RWAVault"
 export ASSET_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="DemoUSD") | .contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
 
 cast call "$REGISTRY_ADDRESS" "isApproved(address)(bool)" "$SUBJECT" --rpc-url "$RPC_URL"
+cast call "$REGISTRY_ADDRESS" "getRecord(address)((bool,uint32,bytes32,uint64))" "$SUBJECT" --rpc-url "$RPC_URL"
 cast send "$ASSET_ADDRESS" "approve(address,uint256)(bool)" "$VAULT_ADDRESS" 1000000 --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL"
 cast send "$VAULT_ADDRESS" "deposit(uint256,address)(uint256)" 1000000 "$SUBJECT" --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL"
 ```
@@ -128,6 +129,7 @@ cast send "$VAULT_ADDRESS" "deposit(uint256,address)(uint256)" 1000000 "$SUBJECT
 Expected:
 - before workflow write: `isApproved=false`, deposit reverts
 - after workflow write: `isApproved=true`, deposit succeeds
+- local simulate may return `txHash=simulation-no-txhash` (or older zero-hash logs); rely on registry reads above for proof.
 
 ## 11) Switch to paid x402 path (next)
 After the free-route e2e passes:
@@ -135,3 +137,18 @@ After the free-route e2e passes:
 2. set `X402_PAY_TO=<your base-sepolia address>`
 3. change workflow run target to `staging-settings` (uses `/kyb` and `x402Enabled=true`)
 4. ensure `X402_BUYER_PRIVATE_KEY` is set in `cre/chainlink-Convergence/.env`
+
+## 12) Force Sumsub sandbox outcome (for approve-path demo)
+If KYB stays `REJECTED`/pending, mark the sandbox applicant completed with `GREEN`:
+```bash
+curl -sS -X POST http://127.0.0.1:3001/kyb/free \
+  -H 'content-type: application/json' \
+  -d '{"subject":"'"$SUBJECT"'","docBundleHash":"'"$DOC_BUNDLE_HASH"'","metadataUri":"'"$METADATA_URI"'","companyInfo":{"companyName":"Acme LLC","country":"USA"}}' | jq
+```
+Copy `sumsub.applicantId` from response, then:
+```bash
+curl -sS -X POST http://127.0.0.1:3001/sumsub/sandbox/testCompleted \
+  -H 'content-type: application/json' \
+  -d '{"applicantId":"<APPLICANT_ID>","reviewAnswer":"GREEN"}' | jq
+```
+Rerun step 9 and step 10.

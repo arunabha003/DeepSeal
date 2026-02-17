@@ -81,6 +81,8 @@ Create `cre/chainlink-Convergence/.env` from `cre/chainlink-Convergence/.env.exa
 - `CRE_ETH_PRIVATE_KEY` (same key as above)
 - `GEMINI_API_KEY`
 - `X402_BUYER_PRIVATE_KEY` (buyer wallet for x402 retries)
+- If CRE secrets are unavailable for your org (`owner not linked`), use local config fallback:
+  - `node tools/sync-local-secrets-to-config.mjs`
 
 Run readiness checks before simulation:
 ```bash
@@ -96,7 +98,8 @@ cat > http-payload.local.json <<EOF
 EOF
 
 # Anvil/fork e2e (free KYB route)
-cre workflow simulate ./my-workflow --target anvil-e2e-settings --trigger-index 0 --http-payload ./http-payload.local.json -e .env
+PAYLOAD=$(jq -c . ./http-payload.local.json)
+cre workflow simulate ./my-workflow --target anvil-e2e-settings --trigger-index 0 --http-payload "$PAYLOAD" -e .env
 
 # Base Sepolia paid path
 cre workflow simulate ./my-workflow --target staging-settings --trigger-index 0 --http-payload ./http-payload.local.json --broadcast -e .env

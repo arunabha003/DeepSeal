@@ -21,7 +21,7 @@ anvil-e2e-settings:
   workflow-artifacts:
     workflow-path: "./main.ts"
     config-path: "./config.anvil-e2e.json"
-    secrets-path: ""
+    secrets-path: "../secrets.yaml"
 
 # ==========================================================================
 staging-settings:

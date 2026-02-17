@@ -39,7 +39,8 @@ npm run dev
 ## 5) Simulate
 From `cre/chainlink-Convergence`:
 ```bash
-cre workflow simulate ./my-workflow --target anvil-e2e-settings --trigger-index 0 --http-payload ../http-payload.json
+PAYLOAD=$(jq -c . ../http-payload.json)
+cre workflow simulate ./my-workflow --target anvil-e2e-settings --trigger-index 0 --http-payload "$PAYLOAD"
 ```
 
 Example `../http-payload.json`:

@@ -26,6 +26,7 @@ Runbook: `docs/sepolia-demo.md`.
 Anvil Base Sepolia fork e2e (real Sumsub + real Gemini): `docs/anvil-base-sepolia-e2e.md`.
 Quick preflight: `node tools/readiness-check.mjs`.
 Auto-wire CRE config addresses from latest deploy: `node tools/sync-cre-config.mjs --chain-id 84532 --config cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json`.
+Sync local `.env` secrets into anvil config fallback: `node tools/sync-local-secrets-to-config.mjs`.
 
 ## Local deploy (anvil)
 Terminal 1:

@@ -33,6 +33,10 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
   - `tools/readiness-check.mjs` validates CRE config addresses + deployed code + KYB provider health before simulate.
 - Config sync helper:
   - `tools/sync-cre-config.mjs` updates CRE config addresses from Foundry deploy broadcast.
+- Local secret fallback helper (for orgs without CRE `link-key` access):
+  - `tools/sync-local-secrets-to-config.mjs` copies `.env` keys into `config.anvil-e2e.json`.
+- Gemini model fallback in workflow:
+  - If configured model is unavailable, workflow lists models and retries with an available `generateContent` model.
 
 ## What’s left
 - Deploy contracts to Sepolia and fill:
@@ -47,3 +51,7 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
   - `cre version` is current (`cre update`)
   - Your `project.yaml` RPC is reachable
   - If using EVM log triggers, use a WebSocket RPC; this workflow uses HTTP trigger to avoid subscriptions for now.
+- `cre secrets` may fail with `owner not linked` for organizations not enabled for workflow deployment access.
+  - Mitigation for local demos: use config fallbacks (`geminiApiKey`, `x402BuyerPrivateKey`) in `config.anvil-e2e.json`.
+- In local simulation, `writeReport` may not expose a real tx hash (simulator can return empty/zero hash).
+  - Validate success by reading `ComplianceRegistry.getRecord(subject)` after simulation.
