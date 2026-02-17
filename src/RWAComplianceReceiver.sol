@@ -11,6 +11,25 @@ interface IReceiver is IERC165 {
     function onReport(bytes calldata metadata, bytes calldata report) external;
 }
 
+interface IReputationRegistry {
+    function giveFeedback(
+        uint256 agentId,
+        int128 value,
+        uint8 valueDecimals,
+        string calldata tag1,
+        string calldata tag2,
+        string calldata endpoint,
+        string calldata feedbackURI,
+        bytes32 feedbackHash
+    ) external;
+}
+
+interface IValidationRegistry {
+    function validationRequest(address validatorAddress, uint256 agentId, string calldata requestURI, bytes32 requestHash) external;
+    function validationResponse(bytes32 requestHash, uint8 response, string calldata responseURI, bytes32 responseHash, string calldata tag)
+        external;
+}
+
 /// @notice Receiver contract for CRE `EVMClient.writeReport` workflows.
 /// The Keystone Forwarder calls `onReport(metadata, report)` after verifying DON signatures.
 /// This contract validates workflow identity from `metadata`, decodes `report`, and writes the
@@ -26,6 +45,16 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
     bytes32 public easSchemaUid;
     bool public easRevocable;
 
+    /// @dev Optional: automated ERC-8004 side effects.
+    IReputationRegistry public reputationRegistry;
+    uint256 public reputationAgentId;
+    uint8 public reputationValueDecimals;
+
+    IValidationRegistry public validationRegistry;
+    uint256 public validationAgentId;
+    address public validationResponder;
+    bool public validationAutoRespond;
+
     bytes32 public expectedWorkflowId; // optional (0 disables check)
     address public expectedAuthor; // optional (0 disables check)
     bytes10 public expectedWorkflowName; // optional (0 disables check)
@@ -36,12 +65,21 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
     event EASConfigUpdated(address indexed eas, bytes32 indexed schemaUid, bool revocable);
     event EASAttested(address indexed subject, bytes32 indexed uid);
     event EASAttestFailed(address indexed subject, bytes reason);
+    event ERC8004ReputationConfigUpdated(address indexed registry, uint256 indexed agentId, uint8 valueDecimals);
+    event ERC8004ValidationConfigUpdated(address indexed registry, uint256 indexed agentId, address indexed responder, bool autoRespond);
+    event ERC8004ReputationWritten(uint256 indexed agentId, int128 value, uint8 valueDecimals, bytes32 feedbackHash);
+    event ERC8004ReputationWriteFailed(uint256 indexed agentId, bytes reason);
+    event ERC8004ValidationRequested(uint256 indexed agentId, bytes32 indexed requestHash, address indexed responder);
+    event ERC8004ValidationRequestFailed(uint256 indexed agentId, bytes reason);
+    event ERC8004ValidationResponded(uint256 indexed agentId, bytes32 indexed requestHash, uint8 response, bytes32 responseHash);
+    event ERC8004ValidationResponseFailed(uint256 indexed agentId, bytes32 indexed requestHash, bytes reason);
 
     error InvalidForwarder(address caller);
     error InvalidWorkflowId(bytes32 received, bytes32 expected);
     error InvalidAuthor(address received, address expected);
     error InvalidWorkflowName(bytes10 received, bytes10 expected);
     error ZeroAddress();
+    error ValueDecimalsOutOfRange(uint8 valueDecimals);
 
     constructor(
         address initialOwner,
@@ -83,6 +121,22 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
         easSchemaUid = schemaUid_;
         easRevocable = revocable_;
         emit EASConfigUpdated(eas_, schemaUid_, revocable_);
+    }
+
+    function setERC8004Reputation(address registry_, uint256 agentId_, uint8 valueDecimals_) external onlyOwner {
+        if (valueDecimals_ > 18) revert ValueDecimalsOutOfRange(valueDecimals_);
+        reputationRegistry = IReputationRegistry(registry_);
+        reputationAgentId = agentId_;
+        reputationValueDecimals = valueDecimals_;
+        emit ERC8004ReputationConfigUpdated(registry_, agentId_, valueDecimals_);
+    }
+
+    function setERC8004Validation(address registry_, uint256 agentId_, address responder_, bool autoRespond_) external onlyOwner {
+        validationRegistry = IValidationRegistry(registry_);
+        validationAgentId = agentId_;
+        validationResponder = responder_;
+        validationAutoRespond = autoRespond_;
+        emit ERC8004ValidationConfigUpdated(registry_, agentId_, responder_, autoRespond_);
     }
 
     /// @notice Called by Keystone Forwarder with the DON-verified report.
@@ -130,6 +184,8 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
                 emit EASAttestFailed(subject, reason);
             }
         }
+
+        _tryRecordERC8004Artifacts(subject, approved, riskScore, attestationHash);
     }
 
     function _buildEASData(address subject, bool approved, uint32 riskScore, bytes32 attestationHash)
@@ -138,6 +194,59 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
         returns (bytes memory)
     {
         return abi.encode(subject, approved, riskScore, attestationHash, uint64(block.timestamp));
+    }
+
+    function _tryRecordERC8004Artifacts(address subject, bool approved, uint32 riskScore, bytes32 attestationHash) internal {
+        IReputationRegistry rep = reputationRegistry;
+        uint256 repAgent = reputationAgentId;
+        uint8 decimals = reputationValueDecimals;
+        if (address(rep) != address(0) && repAgent != 0) {
+            int128 value = _toReputationValue(approved, riskScore);
+            bytes32 feedbackHash = keccak256(abi.encode(subject, approved, riskScore, attestationHash, block.timestamp));
+            try rep.giveFeedback(
+                repAgent, value, decimals, "diligence", approved ? "approved" : "rejected", "", "", feedbackHash
+            ) {
+                emit ERC8004ReputationWritten(repAgent, value, decimals, feedbackHash);
+            } catch (bytes memory reason) {
+                emit ERC8004ReputationWriteFailed(repAgent, reason);
+            }
+        }
+
+        IValidationRegistry val = validationRegistry;
+        uint256 valAgent = validationAgentId;
+        address responder = validationResponder;
+        if (address(val) != address(0) && valAgent != 0 && responder != address(0)) {
+            bytes32 requestHash = keccak256(abi.encode(subject, attestationHash, valAgent, block.timestamp, address(this)));
+            try val.validationRequest(responder, valAgent, "", requestHash) {
+                emit ERC8004ValidationRequested(valAgent, requestHash, responder);
+
+                if (validationAutoRespond && responder == address(this)) {
+                    uint8 response = _toValidationResponse(approved, riskScore);
+                    bytes32 responseHash = keccak256(abi.encode(attestationHash, riskScore, approved));
+                    try val.validationResponse(requestHash, response, "", responseHash, approved ? "approved" : "rejected") {
+                        emit ERC8004ValidationResponded(valAgent, requestHash, response, responseHash);
+                    } catch (bytes memory reason) {
+                        emit ERC8004ValidationResponseFailed(valAgent, requestHash, reason);
+                    }
+                }
+            } catch (bytes memory reason) {
+                emit ERC8004ValidationRequestFailed(valAgent, reason);
+            }
+        }
+    }
+
+    function _toReputationValue(bool approved, uint32 riskScore) internal pure returns (int128) {
+        uint256 bounded = riskScore > 1000 ? 1000 : uint256(riskScore);
+        if (approved) {
+            return int128(int256(1000 - bounded));
+        }
+        return -int128(int256(bounded));
+    }
+
+    function _toValidationResponse(bool approved, uint32 riskScore) internal pure returns (uint8) {
+        if (!approved) return 0;
+        uint256 bounded = riskScore > 1000 ? 1000 : uint256(riskScore);
+        return uint8(100 - (bounded / 10));
     }
 
     /// @notice Extract workflow identity fields from the metadata parameter of onReport.

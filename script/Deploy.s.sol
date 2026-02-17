@@ -49,6 +49,15 @@ contract Deploy is Script {
         ValidationRegistry validationRegistry = new ValidationRegistry();
         validationRegistry.initialize(address(identityRegistry));
 
+        string memory reputationAgentUri = vm.envOr("REPUTATION_AGENT_URI", string("ipfs://agents/rwa-diligence-reputation"));
+        string memory validationAgentUri = vm.envOr("VALIDATION_AGENT_URI", string("ipfs://agents/rwa-diligence-validator"));
+        uint256 reputationAgentId = identityRegistry.register(reputationAgentUri);
+        uint256 validationAgentId = identityRegistry.register(validationAgentUri);
+
+        identityRegistry.approve(address(receiver), validationAgentId);
+        receiver.setERC8004Reputation(address(reputationRegistry), reputationAgentId, 0);
+        receiver.setERC8004Validation(address(validationRegistry), validationAgentId, address(receiver), true);
+
         // Optional: seed deployer with demo funds for local testing
         uint256 seedAmount = vm.envOr("SEED_AMOUNT", uint256(1_000_000e6));
         asset.mint(deployer, seedAmount);
@@ -68,6 +77,8 @@ contract Deploy is Script {
         console2.log("ERC8004 IdentityRegistry:", address(identityRegistry));
         console2.log("ERC8004 ReputationRegistry:", address(reputationRegistry));
         console2.log("ERC8004 ValidationRegistry:", address(validationRegistry));
+        console2.log("ERC8004 ReputationAgentId:", reputationAgentId);
+        console2.log("ERC8004 ValidationAgentId:", validationAgentId);
         console2.log("EAS Attestation Contract:", easContract);
         console2.logBytes32(easSchemaUid);
     }

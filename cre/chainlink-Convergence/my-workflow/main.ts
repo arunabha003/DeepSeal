@@ -121,6 +121,30 @@ const getRequiredSecret = (runtime: Runtime<Config>, id: string): string => {
 
 const decodeBodyUtf8 = (body: Uint8Array): string => Buffer.from(body).toString('utf-8')
 
+const getHttpHeaderValue = (headers: Record<string, string> | undefined, name: string): string | undefined => {
+	if (!headers) return undefined
+	const lowerName = name.toLowerCase()
+	for (const [k, v] of Object.entries(headers)) {
+		if (k.toLowerCase() === lowerName) return v
+	}
+	return undefined
+}
+
+const getConfidentialHeaderValue = (
+	multiHeaders: Record<string, { values?: string[] }> | undefined,
+	name: string,
+): string | undefined => {
+	if (!multiHeaders) return undefined
+	const lowerName = name.toLowerCase()
+	for (const [k, v] of Object.entries(multiHeaders)) {
+		if (k.toLowerCase() === lowerName) {
+			const values = Array.isArray(v?.values) ? v.values : []
+			return values[0]
+		}
+	}
+	return undefined
+}
+
 const safeJsonParse = (s: string): any => {
 	try {
 		return JSON.parse(s)
@@ -331,12 +355,12 @@ const fetchKybHttp = (
 		}
 
 		const parsed = safeJsonParse(decodeBodyUtf8(paid.body))
-		return {
-			providerStatus: parsed.providerStatus,
-			providerScore: parsed.providerScore,
-			providerResponseHash: parsed.providerResponseHash,
-			xPaymentResponseHeader: paid.headers?.['X-PAYMENT-RESPONSE'] || paid.headers?.['x-payment-response'],
-		} as KYBResult
+			return {
+				providerStatus: parsed.providerStatus,
+				providerScore: parsed.providerScore,
+				providerResponseHash: parsed.providerResponseHash,
+				xPaymentResponseHeader: getHttpHeaderValue(paid.headers as Record<string, string> | undefined, 'x-payment-response'),
+			} as KYBResult
 	}
 
 	if (initial.statusCode < 200 || initial.statusCode >= 300) {
@@ -378,7 +402,56 @@ const fetchKybConfidential = (
 		})
 		.result()
 
-	// x402 buyer flow is only implemented for standard HTTP for now (header encoding + retry).
+	if (initial.statusCode === 402 && Boolean(config.x402Enabled)) {
+		const buyerPk = getRequiredSecret(runtime, 'X402_BUYER_PRIVATE_KEY') as `0x${string}`
+
+		const parsed402 = x402ResponseSchema.parse(safeJsonParse(decodeBodyUtf8(initial.body)))
+		const accept0 = parsed402.accepts[0] as any
+		const accept: X402Accept = {
+			scheme: 'exact',
+			network: accept0.network,
+			maxAmountRequired: accept0.maxAmountRequired,
+			resource: accept0.resource || config.kybUrl,
+			payTo: accept0.payTo,
+			asset: accept0.asset,
+			extra: (accept0.extra as any) || {},
+			maxTimeoutSeconds: accept0.maxTimeoutSeconds || 120,
+		}
+
+		const xPayment = buildXPaymentHeaderExactEvm(accept, buyerPk, `kyb:${req.subject}:${req.docBundleHash}`)
+
+		const paid = sendRequester
+			.sendRequest({
+				vaultDonSecrets: [],
+				encryptOutput: false,
+				request: {
+					method: 'POST',
+					url: config.kybUrl.replace(/\/kyb\/free$/, '/kyb'),
+					bodyString,
+					multiHeaders: {
+						'content-type': { values: ['application/json'] },
+						'X-PAYMENT': { values: [xPayment] },
+					},
+				},
+			})
+			.result()
+
+		if (paid.statusCode < 200 || paid.statusCode >= 300) {
+			throw new Error(`KYB x402-paid confidential request failed with status: ${paid.statusCode} body=${decodeBodyUtf8(paid.body)}`)
+		}
+
+		const parsed = safeJsonParse(decodeBodyUtf8(paid.body))
+		return {
+			providerStatus: parsed.providerStatus,
+			providerScore: parsed.providerScore,
+			providerResponseHash: parsed.providerResponseHash,
+			xPaymentResponseHeader: getConfidentialHeaderValue(
+				paid.multiHeaders as Record<string, { values?: string[] }> | undefined,
+				'x-payment-response',
+			),
+		} as KYBResult
+	}
+
 	if (initial.statusCode < 200 || initial.statusCode >= 300) {
 		throw new Error(
 			`KYB Confidential HTTP request failed with status: ${initial.statusCode} body=${decodeBodyUtf8(initial.body)}`,
@@ -661,13 +734,13 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 
 	const apiKey = getRequiredSecret(runtime, 'GEMINI_API_KEY')
 
-		const geminiRisk = new HTTPClient()
-			.sendRequest(
-				runtime,
-				(sr: HTTPSendRequester, cfg: Config) => fetchGeminiRisk(sr, cfg, apiKey, prompt, runtime),
-				ConsensusAggregationByFields<RiskObservation>({
-					approved: identical,
-					riskScore: median,
+	const geminiRisk = new HTTPClient()
+		.sendRequest(
+			runtime,
+			(sr: HTTPSendRequester, cfg: Config) => fetchGeminiRisk(sr, cfg, apiKey, prompt, runtime),
+			ConsensusAggregationByFields<RiskObservation>({
+				approved: identical,
+				riskScore: median,
 				reasonsText: identical,
 			}),
 		)(runtime.config)
