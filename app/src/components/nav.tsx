@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useAccount,
   useChainId,
   useConnect,
   useDisconnect,
   usePublicClient,
-  useSwitchChain,
 } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { truncAddr } from "@/lib/utils";
@@ -30,13 +29,53 @@ export function Nav() {
   const chainId = useChainId();
   const { connect } = useConnect();
   const { disconnect } = useDisconnect();
-  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const publicClient = usePublicClient({ chainId: anvilBaseSepolia.id });
   const [contractStatus, setContractStatus] = useState<"idle" | "checking" | "ready" | "missing">("idle");
+  const [isSwitchingChain, setIsSwitchingChain] = useState(false);
   const didAutoSwitch = useRef(false);
 
   const wrongChain = isConnected && chainId !== anvilBaseSepolia.id;
   const missingContracts = isConnected && chainId === anvilBaseSepolia.id && contractStatus === "missing";
+
+  const ensureAnvilNetwork = useCallback(async () => {
+    const ethereum = (window as unknown as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+    if (!ethereum) return;
+
+    const chainIdHex = `0x${anvilBaseSepolia.id.toString(16)}`;
+    setIsSwitchingChain(true);
+    try {
+      await ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: chainIdHex }],
+      });
+    } catch (error: any) {
+      const msg = String(error?.message || error);
+      const code = Number(error?.code);
+      const shouldAddChain =
+        code === 4902 || code === -32603 || /unrecognized chain|chain.*not added|different chain id/i.test(msg.toLowerCase());
+
+      if (!shouldAddChain) throw error;
+
+      await ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [
+          {
+            chainId: chainIdHex,
+            chainName: anvilBaseSepolia.name,
+            nativeCurrency: anvilBaseSepolia.nativeCurrency,
+            rpcUrls: ["http://127.0.0.1:8545", "http://localhost:8545"],
+            blockExplorerUrls: ["https://sepolia.basescan.org"],
+          },
+        ],
+      });
+      await ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: chainIdHex }],
+      });
+    } finally {
+      setIsSwitchingChain(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isConnected) {
@@ -49,7 +88,7 @@ export function Nav() {
       setContractStatus("idle");
       if (!didAutoSwitch.current) {
         didAutoSwitch.current = true;
-        switchChain({ chainId: anvilBaseSepolia.id });
+        ensureAnvilNetwork().catch(() => undefined);
       }
       return;
     }
@@ -70,7 +109,7 @@ export function Nav() {
     return () => {
       cancelled = true;
     };
-  }, [isConnected, chainId, publicClient, switchChain]);
+  }, [isConnected, chainId, publicClient, ensureAnvilNetwork]);
 
   return (
     <header className="border-b border-surface-3 bg-surface-1/80 backdrop-blur-sm sticky top-0 z-50">
@@ -101,7 +140,7 @@ export function Nav() {
             <div className="flex items-center gap-2">
               {wrongChain ? (
                 <button
-                  onClick={() => switchChain({ chainId: anvilBaseSepolia.id })}
+                  onClick={() => ensureAnvilNetwork().catch(() => undefined)}
                   className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-warning/15 text-warning hover:bg-warning/25"
                 >
                   {isSwitchingChain ? "Switching..." : "Wrong network"}
@@ -116,7 +155,10 @@ export function Nav() {
             </div>
           ) : (
             <button
-              onClick={() => connect({ connector: injected(), chainId: anvilBaseSepolia.id })}
+              onClick={async () => {
+                await ensureAnvilNetwork().catch(() => undefined);
+                connect({ connector: injected(), chainId: anvilBaseSepolia.id });
+              }}
               className="px-3 py-1.5 rounded-md text-xs font-medium bg-accent text-white hover:bg-accent/90"
             >
               Connect Wallet
@@ -134,7 +176,7 @@ export function Nav() {
             </span>
             {wrongChain ? (
               <button
-                onClick={() => switchChain({ chainId: anvilBaseSepolia.id })}
+                onClick={() => ensureAnvilNetwork().catch(() => undefined)}
                 className="px-2 py-1 rounded bg-warning/20 hover:bg-warning/30 text-warning whitespace-nowrap"
               >
                 {isSwitchingChain ? "Switching..." : "Switch network"}
