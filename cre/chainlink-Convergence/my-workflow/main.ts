@@ -114,6 +114,28 @@ const safeJsonParse = (s: string): any => {
 	}
 }
 
+const parseTriggerInput = (raw: string): any => {
+	const trimmed = raw.trim()
+	try {
+		return JSON.parse(trimmed)
+	} catch (e: any) {
+		if (/^[0-9]+$/.test(trimmed)) {
+			return { requestId: Number(trimmed) }
+		}
+		if (
+			trimmed.startsWith('./') ||
+			trimmed.startsWith('../') ||
+			trimmed.endsWith('.json') ||
+			trimmed.includes('/')
+		) {
+			throw new Error(
+				`HTTP trigger input looks like a file path (${trimmed}) but workflow received a raw string. Pass inline JSON (e.g. {"requestId":1}) or ensure CRE loads the file path correctly.`,
+			)
+		}
+		throw new Error(`Invalid HTTP trigger JSON: ${e?.message || e}. Raw=${trimmed}`)
+	}
+}
+
 type X402Accept = {
 	scheme: 'exact'
 	network: string
@@ -514,7 +536,7 @@ const writeDecision = (runtime: Runtime<Config>, reportHex: `0x${string}`): stri
 
 const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<string> => {
 	const inputJson = Buffer.from(payload.input).toString('utf-8')
-	const parsed = requestSchema.parse(JSON.parse(inputJson))
+	const parsed = requestSchema.parse(parseTriggerInput(inputJson))
 	const requestId = BigInt(typeof parsed.requestId === 'string' ? parsed.requestId : parsed.requestId)
 	const companyInfo = parsed.companyInfo
 
