@@ -27,9 +27,12 @@ This doc is the tracked counterpart to local notes. It summarizes what exists in
   - `src/RWAComplianceReceiver.sol` (configurable via `setEAS(...)`, wired in `script/Deploy.s.sol`)
 - CRE project scaffold + workflow:
   - `cre/chainlink-Convergence/my-workflow/main.ts` (HTTP trigger)
+  - `cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json` (fork e2e profile)
   - `cre/abi/*.json` (ABIs exported for integration)
 - Preflight helper:
   - `tools/readiness-check.mjs` validates CRE config addresses + deployed code + KYB provider health before simulate.
+- Config sync helper:
+  - `tools/sync-cre-config.mjs` updates CRE config addresses from Foundry deploy broadcast.
 
 ## What’s left
 - Deploy contracts to Sepolia and fill:

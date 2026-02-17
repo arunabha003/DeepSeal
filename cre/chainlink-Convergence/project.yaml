@@ -24,14 +24,21 @@
 #       forwarder: "0x..."                          # Forwarder contract address on the chain
 
 # ==========================================================================
+anvil-e2e-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia-base-1
+      # Anvil started with a Base Sepolia fork URL.
+      url: http://127.0.0.1:8545
+
+# ==========================================================================
 staging-settings:
   rpcs:
-    - chain-name: ethereum-testnet-sepolia
-      # Use a public RPC by default (no API key). Replace with your own if desired.
-      url: https://ethereum-sepolia-rpc.publicnode.com
+    - chain-name: ethereum-testnet-sepolia-base-1
+      # Base Sepolia public RPC. Replace with your own if desired.
+      url: https://sepolia.base.org
 
 # ==========================================================================
 production-settings:
   rpcs:
-    - chain-name: ethereum-testnet-sepolia
-      url: https://ethereum-sepolia-rpc.publicnode.com
+    - chain-name: ethereum-testnet-sepolia-base-1
+      url: https://sepolia.base.org

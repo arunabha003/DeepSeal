@@ -3,8 +3,9 @@
 This is the tracked to-do list for hackathon readiness (what still needs doing beyond local notes).
 
 ## Demo-critical
-- Deploy contracts on Sepolia and record addresses (portal, receiver, registry, vault, ERC-8004 registries).
-- Update `cre/chainlink-Convergence/my-workflow/config.staging.json` with Sepolia addresses.
+- [ ] Run Anvil Base Sepolia fork e2e from `docs/anvil-base-sepolia-e2e.md`.
+- [ ] Deploy contracts on Base Sepolia and record addresses (portal, receiver, registry, vault, ERC-8004 registries).
+- [ ] Update `cre/chainlink-Convergence/my-workflow/config.staging.json` with Base Sepolia addresses.
 - Set CRE secrets:
   - `GEMINI_API_KEY`
   - `CRE_ETH_PRIVATE_KEY`

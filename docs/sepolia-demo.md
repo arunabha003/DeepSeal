@@ -1,5 +1,7 @@
 # Sepolia demo runbook
 
+For local Anvil fork e2e first, use `docs/anvil-base-sepolia-e2e.md`.
+
 End-to-end path:
 1) deploy contracts
 2) submit diligence request (onchain)

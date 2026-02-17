@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 function die(msg) {
@@ -20,7 +20,15 @@ function isZeroAddress(v) {
 
 function checkConfig() {
   const configPath =
-    process.env.CRE_CONFIG_PATH || "cre/chainlink-Convergence/my-workflow/config.staging.json";
+    process.env.CRE_CONFIG_PATH ||
+    [
+      "cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json",
+      "cre/chainlink-Convergence/my-workflow/config.staging.json",
+      "cre/chainlink-Convergence/my-workflow/config.production.json",
+    ].find((p) => existsSync(p));
+  if (!configPath) {
+    die("No CRE config file found. Set CRE_CONFIG_PATH explicitly.");
+  }
   let cfg;
   try {
     cfg = JSON.parse(readFileSync(configPath, "utf8"));
