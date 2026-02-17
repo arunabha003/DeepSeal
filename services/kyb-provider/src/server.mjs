@@ -78,9 +78,6 @@ const resolveAssetEip712 = async (network, assetAddress, fallback) => {
     return { name: overrideName, version: overrideVersion }
   }
 
-  const chain = chainByX402Network[network]
-  if (!chain) throw new Error(`Unsupported X402 network: ${network}`)
-
   let onchainName = ''
   let onchainVersion = ''
   let onchainDomainSeparator = ''
@@ -101,10 +98,13 @@ const resolveAssetEip712 = async (network, assetAddress, fallback) => {
     onchainVersion = typeof version === 'string' ? version : ''
     onchainDomainSeparator = typeof domainSeparator === 'string' ? domainSeparator.toLowerCase() : ''
   } catch {
-    // Use candidates below.
+    // Fallback to configured defaults below.
   }
 
-  const seen = new Set()
+  const chain = chainByX402Network[network]
+  if (!chain) throw new Error(`Unsupported X402 network: ${network}`)
+
+  const dedupe = new Set()
   const candidates = [
     onchainName && onchainVersion ? { name: onchainName, version: onchainVersion } : null,
     fallback || null,
@@ -114,28 +114,36 @@ const resolveAssetEip712 = async (network, assetAddress, fallback) => {
     { name: 'USDC', version: '1' },
   ]
     .filter(Boolean)
-    .filter((c) => {
-      const key = `${c.name}::${c.version}`
-      if (seen.has(key)) return false
-      seen.add(key)
+    .filter((candidate) => {
+      const key = `${candidate.name}::${candidate.version}`
+      if (dedupe.has(key)) return false
+      dedupe.add(key)
       return true
     })
 
-  if (onchainDomainSeparator && /^0x[0-9a-fA-F]{64}$/.test(onchainDomainSeparator)) {
+  if (/^0x[0-9a-fA-F]{64}$/.test(onchainDomainSeparator)) {
+    const domainTypes = {
+      EIP712Domain: [
+        { name: 'name', type: 'string' },
+        { name: 'version', type: 'string' },
+        { name: 'chainId', type: 'uint256' },
+        { name: 'verifyingContract', type: 'address' },
+      ],
+    }
     for (const candidate of candidates) {
-      const sep = hashDomain({
-        name: candidate.name,
-        version: candidate.version,
-        chainId: chain.id,
-        verifyingContract: assetAddress,
+      const separator = hashDomain({
+        domain: {
+          name: candidate.name,
+          version: candidate.version,
+          chainId: chain.id,
+          verifyingContract: assetAddress,
+        },
+        types: domainTypes,
       }).toLowerCase()
-      if (sep === onchainDomainSeparator) {
+      if (separator === onchainDomainSeparator) {
         return candidate
       }
     }
-    throw new Error(
-      `Could not match EIP-712 domain for asset ${assetAddress}. Onchain DOMAIN_SEPARATOR=${onchainDomainSeparator}. Set X402_EIP712_NAME and X402_EIP712_VERSION explicitly.`,
-    )
   }
 
   if (onchainName && onchainVersion) return { name: onchainName, version: onchainVersion }
