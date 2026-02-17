@@ -1,13 +1,16 @@
 import dotenv from 'dotenv'
 import crypto from 'node:crypto'
 import express from 'express'
+import { createPublicClient, createWalletClient, http, isAddress } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
+import { avalanche, avalancheFuji, base, baseSepolia, polygon, polygonAmoy } from 'viem/chains'
 
 dotenv.config({ path: new URL('../.env', import.meta.url) })
 
 import { decodePayment } from 'x402/schemes'
 import { getDefaultAsset, processPriceToAtomicAmount } from 'x402/shared'
 import { settleResponseHeader } from 'x402/types'
-import { settle, verify } from 'x402/verify'
+import { settle, verify } from 'x402/facilitator'
 
 const app = express()
 app.use(express.json({ limit: '2mb' }))
@@ -16,10 +19,51 @@ const port = Number(process.env.PORT || 3001)
 const x402Enabled = String(process.env.X402_ENABLED || 'false').toLowerCase() === 'true'
 const x402Version = Number(process.env.X402_VERSION || 1)
 
+const chainByX402Network = {
+  'base-sepolia': baseSepolia,
+  base,
+  'avalanche-fuji': avalancheFuji,
+  avalanche,
+  'polygon-amoy': polygonAmoy,
+  polygon,
+}
+
 const mustEnv = (name) => {
   const v = process.env[name]
   if (!v) throw new Error(`Missing required env var: ${name}`)
   return v
+}
+
+const parseHexPrivateKey = (raw, envName) => {
+  const value = String(raw || '').trim()
+  if (!/^0x[0-9a-fA-F]{64}$/.test(value)) {
+    throw new Error(`${envName} must be a 32-byte hex private key (0x + 64 hex chars)`)
+  }
+  return value
+}
+
+const getX402RelayerPrivateKey = () => {
+  const pk = process.env.X402_RELAYER_PRIVATE_KEY || process.env.PRIVATE_KEY
+  return parseHexPrivateKey(pk, process.env.X402_RELAYER_PRIVATE_KEY ? 'X402_RELAYER_PRIVATE_KEY' : 'PRIVATE_KEY')
+}
+
+const getX402RpcUrl = (network) => {
+  if (process.env.X402_RPC_URL) return process.env.X402_RPC_URL
+  if (process.env.RPC_URL) return process.env.RPC_URL
+  const chain = chainByX402Network[network]
+  if (!chain) throw new Error(`Unsupported X402 network: ${network}`)
+  return chain.rpcUrls.default.http[0]
+}
+
+const getX402Clients = (network) => {
+  const chain = chainByX402Network[network]
+  if (!chain) throw new Error(`Unsupported X402 network: ${network}`)
+  const rpcUrl = getX402RpcUrl(network)
+  const relayerAccount = privateKeyToAccount(getX402RelayerPrivateKey())
+  const transport = http(rpcUrl)
+  const verifyClient = createPublicClient({ chain, transport })
+  const settleClient = createWalletClient({ chain, transport, account: relayerAccount })
+  return { verifyClient, settleClient, relayer: relayerAccount.address, rpcUrl }
 }
 
 const sumsubEnabled =
@@ -124,6 +168,14 @@ const getRequiredIdDocsStatus = async ({ applicantId }) => {
 
 const toPaymentRequirements = (req) => {
   const payTo = mustEnv('X402_PAY_TO')
+  if (!isAddress(payTo)) {
+    const looksLikePrivateKey = /^0x[0-9a-fA-F]{64}$/.test(payTo)
+    throw new Error(
+      looksLikePrivateKey
+        ? 'X402_PAY_TO is a private key, but it must be a recipient wallet address (0x + 40 hex chars).'
+        : 'X402_PAY_TO must be a valid recipient wallet address (0x + 40 hex chars).',
+    )
+  }
   const network = String(process.env.X402_NETWORK || 'base-sepolia')
   const price = process.env.KYB_PRICE || '0.01'
   const timeout = Number(process.env.X402_TIMEOUT_SECONDS || 120)
@@ -265,7 +317,9 @@ app.post('/kyb', async (req, res) => {
     const payload = decodePayment(paymentHeader)
     const paymentRequirements = accepts[0]
 
-    const verifyResp = await verify(payload, paymentRequirements)
+    const { verifyClient, settleClient } = getX402Clients(paymentRequirements.network)
+
+    const verifyResp = await verify(verifyClient, payload, paymentRequirements)
     if (!verifyResp?.isValid) {
       return res.status(402).json({
         x402Version,
@@ -275,7 +329,7 @@ app.post('/kyb', async (req, res) => {
       })
     }
 
-    const settleResp = await settle(payload, paymentRequirements)
+    const settleResp = await settle(settleClient, payload, paymentRequirements)
     if (!settleResp?.success) {
       return res.status(402).json({
         x402Version,
