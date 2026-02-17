@@ -11,7 +11,7 @@ import {
 	type HTTPSendRequester,
 	type ConfidentialHTTPSendRequester,
 	hexToBase64,
-	LAST_FINALIZED_BLOCK_NUMBER,
+	LATEST_BLOCK_NUMBER,
 	Runner,
 	type Runtime,
 	TxStatus,
@@ -87,6 +87,21 @@ type RiskObservation = {
 	approved: boolean
 	riskScore: number
 	reasonsText: string
+}
+
+const getRequiredSecret = (runtime: Runtime<Config>, id: string): string => {
+	try {
+		const secret = runtime.getSecret({ id }).result()
+		const value = typeof secret?.value === 'string' ? secret.value.trim() : String(secret?.value || '').trim()
+		if (!value) {
+			throw new Error(`secret ${id} is empty`)
+		}
+		return value
+	} catch (e: any) {
+		throw new Error(
+			`Missing secret: ${id}. Pass -e .env when simulating locally (from cre/chainlink-Convergence) or set it in CRE secrets manager. Cause: ${e?.message || e}`,
+		)
+	}
 }
 
 const decodeBodyUtf8 = (body: Uint8Array): string => Buffer.from(body).toString('utf-8')
@@ -243,9 +258,7 @@ const fetchKybHttp = (
 
 	// x402 buyer flow (optional): if paywalled, retry with X-PAYMENT
 	if (initial.statusCode === 402 && Boolean(config.x402Enabled)) {
-		const secret = runtime.getSecret({ id: 'X402_BUYER_PRIVATE_KEY' }).result()
-		const buyerPk = secret.value as `0x${string}`
-		if (!buyerPk) throw new Error('Missing secret: X402_BUYER_PRIVATE_KEY')
+		const buyerPk = getRequiredSecret(runtime, 'X402_BUYER_PRIVATE_KEY') as `0x${string}`
 
 		const parsed402 = x402ResponseSchema.parse(safeJsonParse(decodeBodyUtf8(initial.body)))
 		const accept0 = parsed402.accepts[0] as any
@@ -440,7 +453,7 @@ const readRequestFromPortal = (runtime: Runtime<Config>, requestId: bigint): Dil
 				to: runtime.config.diligencePortalAddress as Address,
 				data: callData,
 			}),
-			blockNumber: LAST_FINALIZED_BLOCK_NUMBER,
+			blockNumber: LATEST_BLOCK_NUMBER,
 		})
 		.result()
 
@@ -556,9 +569,7 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 		),
 	].join('\n')
 
-	const secret = runtime.getSecret({ id: 'GEMINI_API_KEY' }).result()
-	const apiKey = secret.value
-	if (!apiKey) throw new Error('Missing secret: GEMINI_API_KEY')
+	const apiKey = getRequiredSecret(runtime, 'GEMINI_API_KEY')
 
 	const geminiRisk = new HTTPClient()
 		.sendRequest(
