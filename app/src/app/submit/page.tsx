@@ -3,17 +3,22 @@
 import { useState } from "react";
 import {
   useAccount,
+  useChainId,
   useWriteContract,
   useWaitForTransactionReceipt,
   useReadContract,
+  useSwitchChain,
 } from "wagmi";
-import { keccak256, toHex, encodePacked } from "viem";
+import { keccak256, toHex } from "viem";
 import { ADDRESSES } from "@/lib/addresses";
 import { DiligencePortalABI } from "@/lib/abis";
 import { Card, CardTitle, Button, Badge } from "@/components/ui";
+import { anvilBaseSepolia } from "@/lib/wagmi";
 
 export default function SubmitPage() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { switchChainAsync, isPending: isSwitchingChain } = useSwitchChain();
 
   const [subject, setSubject] = useState(address || "");
   const [metadataUri, setMetadataUri] = useState("ipfs://rwa-docs/acme");
@@ -36,16 +41,22 @@ export default function SubmitPage() {
 
   const { isLoading: isConfirming, isSuccess: isConfirmed } =
     useWaitForTransactionReceipt({ hash: txHash });
+  const wrongChain = chainId !== anvilBaseSepolia.id;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!subject || !docBundleHash) return;
+    if (wrongChain) {
+      await switchChainAsync({ chainId: anvilBaseSepolia.id });
+      return;
+    }
 
     writeContract({
       address: ADDRESSES.DiligencePortal as `0x${string}`,
       abi: DiligencePortalABI,
       functionName: "submit",
       args: [subject as `0x${string}`, docBundleHash as `0x${string}`, metadataUri],
+      chainId: anvilBaseSepolia.id,
     });
   };
 
@@ -115,7 +126,7 @@ export default function SubmitPage() {
                 placeholder="0x..."
                 className="flex-1 font-mono text-xs"
               />
-              <Button variant="secondary" onClick={computeHash}>
+              <Button type="button" variant="secondary" onClick={computeHash}>
                 Hash URI
               </Button>
             </div>
@@ -127,16 +138,26 @@ export default function SubmitPage() {
             ) : (
               <Button
                 type="submit"
-                disabled={isWriting || isConfirming}
+                disabled={isWriting || isConfirming || isSwitchingChain}
               >
-                {isWriting
+                {isSwitchingChain
+                  ? "Switching network..."
+                  : isWriting
                   ? "Confirm in wallet..."
                   : isConfirming
                   ? "Mining..."
+                  : wrongChain
+                  ? `Switch to ${anvilBaseSepolia.id}`
                   : "Submit Request"}
               </Button>
             )}
           </div>
+
+          {isConnected && wrongChain && (
+            <div className="p-3 rounded-md bg-warning/10 text-warning text-xs">
+              Wallet is on chain {chainId}. Switch to {anvilBaseSepolia.name} ({anvilBaseSepolia.id}) before submit.
+            </div>
+          )}
 
           {writeError && (
             <div className="p-3 rounded-md bg-danger/10 text-danger text-xs font-mono break-all">
