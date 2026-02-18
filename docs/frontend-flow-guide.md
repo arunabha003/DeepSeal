@@ -56,7 +56,7 @@
 
 > At this point the request exists on-chain but has NOT been processed yet.
 
-### Step 3: Process with CRE Workflow (`/process`) ⭐
+### Step 3: Process with CRE Workflow (`/process`) 
 
 This is the magic step — **everything happens automatically from the browser.**
 
@@ -93,7 +93,7 @@ Step 9  ▸ On-Chain Side Effects     → 8 events: Compliance + ERC-8004
 1. Go to **Compliance** tab.
 2. Paste the subject address → click **Lookup**.
 3. You should see:
-   - **Status**: `APPROVED` ✅
+   - **Status**: `APPROVED` 
    - **Risk Score**: e.g. `150 / 1000` (low = good)
    - **Last Updated**: a real timestamp
    - **Attestation**: hash like `0xc9bf26...`
@@ -214,141 +214,6 @@ sandbox by calling the `/sumsub/sandbox/testCompleted` endpoint (see [anvil-base
 
 ---
 
-## ERC-8004 Agents — What They Do
-
-ERC-8004 defines three registries for **autonomous agent** identity, reputation, and validation.
-Our protocol uses them to create a transparent trust layer around compliance decisions.
-
-### What happens during `onReport()`:
-
-When the CRE workflow completes and `RWAComplianceReceiver.onReport()` is called, it triggers
-**8 on-chain events** in a single transaction:
-
-```
-1. ComplianceRegistry.ComplianceUpdated(subject, approved, riskScore, attestation, timestamp)
-   → The core compliance update — enables/disables vault access
-
-2. RWAComplianceReceiver.ReportProcessed(subject, approved, riskScore, attestation)
-   → Audit trail for every processed report
-
-3. ReputationRegistry.NewFeedback(agentId=1, value, decimals, feedbackHash)
-   → Agent #1 receives a reputation score:
-     - APPROVED → positive value (1000 - riskScore)
-     - REJECTED → negative value (-riskScore)
-
-4. RWAComplianceReceiver.ERC8004ReputationWritten(agentId=1, value, decimals, feedbackHash)
-   → Confirmation that reputation was recorded
-
-5. ValidationRegistry.ValidationRequested(agentId=2, requestHash, responder)
-   → Validation Agent #2 is asked to validate the decision
-
-6. RWAComplianceReceiver.ERC8004ValidationRequested(agentId=2, requestHash, responder)
-   → Confirmation that validation was requested
-
-7. ValidationRegistry.ValidationResponded(requestHash, response, responseURI, responseHash, tag)
-   → Agent auto-responds with a validation score based on approval status
-
-8. RWAComplianceReceiver.ERC8004ValidationResponded(agentId=2, requestHash, response, responseHash)
-   → Confirmation that validation response was recorded
-```
-
-### Practical Example:
-
-**Scenario 1:** Acme LLC submits for KYB compliance → KYB APPROVED → Gemini riskScore=150 → approved=true
-
-| Agent | Action | Value | Why It Matters |
-|-------|--------|-------|----------------|
-| **Reputation Agent #1** | Gets feedback | `+850` (1000-150) | **Good decision**: Agent approved a LOW-risk company. Positive reputation. |
-| **Validation Agent #2** | Validates decision | Response score `85` (100 - 150/10) | Confirms the decision quality |
-
-**Scenario 2:** Shady Corp → KYB REJECTED → riskScore=950 → approved=false
-
-| Agent | Action | Value | Why It Matters |
-|-------|--------|-------|----------------|
-| **Reputation Agent #1** | Gets feedback | `+450` (950 - 500) | **Good decision**: Agent rejected a HIGH-risk company. Positive reputation. |
-| **Validation Agent #2** | Validates decision | Response score `0` | Rejection confirmed |
-
-**Scenario 3:** False positive → LegitCorp rejected with riskScore=150
-
-| Agent | Action | Value | Why It Matters |
-|-------|--------|-------|----------------|
-| **Reputation Agent #1** | Gets feedback | `-350` (150 - 500) | **Bad decision**: Agent rejected a LOW-risk company. Negative reputation (false positive). |
-
-### What Agent #1 actually represents:
-
-**Agent #1 = The CRE compliance assessment system itself** (the combination of KYB + Gemini AI + decision logic).
-
-Its reputation tracks **decision quality**:
-- ✅ Approving low-risk companies = good
-- ✅ Rejecting high-risk companies = good  
-- ❌ Approving high-risk companies = questionable
-- ❌ Rejecting low-risk companies = bad (false positive)
-
-### Why this matters for real-world RWAs:
-
-- **Composable trust**: Other DeFi protocols can query Agent #1's reputation to see: "Does this compliance system make good decisions? What's its track record?"
-- **Decision quality tracking**: High reputation = mostly correct approvals of safe companies + correct rejections of risky ones
-- **Audit trail**: Every decision is validated on-chain by Agent #2 — regulators/judges can verify
-- **Machine-readable**: Agent identities in `IdentityRegistry` are queryable by any smart contract
-- **Decentralized verification**: In production, different DON nodes could run different compliance agents, creating cross-validated assessments
-
----
-
-## Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    BROWSER (Next.js at :3000)                    │
-│                                                                  │
-│  /submit ──► DiligencePortal.submit()                           │
-│       │                                                         │
-│       ▼                                                         │
-│  /process ──► Next.js API Route (/api/workflow/run)             │
-│       │           │                                              │
-│       │     1. Writes payload to http-payload.local.json        │
-│       │     2. Syncs Anvil block timestamp                      │
-│       │     3. Spawns `cre workflow simulate`                   │
-│       │           │                                              │
-│       │    ┌──────┘ (SSE streams every step to browser)         │
-│       │    │                                                     │
-│       │    │   CRE reads DiligencePortal on-chain               │
-│       │    │        │                                            │
-│       │    │        ▼                                            │
-│       │    │   KYB Provider (:3001) ──► Sumsub API              │
-│       │    │        │          (x402 payment rail)              │
-│       │    │        ▼                                            │
-│       │    │   Gemini AI ──► Risk JSON                          │
-│       │    │        │                                            │
-│       │    │        ▼                                            │
-│       │    │   Final Decision (merge KYB + Gemini)              │
-│       │    │                                                     │
-│       │    └──────► CRE result parsed                           │
-│       │                                                         │
-│       │     4. Calls RWAComplianceReceiver.onReport()           │
-│       │           │                                              │
-│       │           ├─► ComplianceRegistry.setApproval()          │
-│       │           ├─► ReputationRegistry.giveFeedback()         │
-│       │           └─► ValidationRegistry.request + respond      │
-│       │                                                         │
-│       ▼                                                         │
-│  /compliance ◄─── reads ComplianceRegistry                     │
-│  /vault      ◄─── deposits if isApproved() == true             │
-│  /agents     ◄─── browse reputation + validation data          │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│               ANVIL (Base Sepolia Fork at :8545)                │
-│                                                                  │
-│  DiligencePortal     ComplianceRegistry    RWAVault (ERC-4626) │
-│  RWAComplianceReceiver  DemoUSD           IdentityRegistry      │
-│  ReputationRegistry     ValidationRegistry                      │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
 ## Quick Reference: What Each Page Reads On-Chain
 
 | Page | Contract | Functions | Updates When |
@@ -367,13 +232,3 @@ Its reputation tracks **decision quality**:
 | | ReputationRegistry | `getFeedback()`, `giveFeedback()` | After feedback / workflow |
 | | ValidationRegistry | `validationRequest()`, `validationResponse()` | After validation / workflow |
 
----
-
-## TL;DR — Happy Path in 4 Clicks
-
-1. **Connect wallet** on Dashboard
-2. **Submit Request** on `/submit` → click **Process with CRE Workflow →**
-3. **Fill company info** → click **▶ Run CRE Workflow** → watch 9 steps stream live
-4. **Check Compliance** → **APPROVED** → **Deposit into Vault** 🎉
-
-No terminal commands. No manual `cast send`. Everything from the browser.
