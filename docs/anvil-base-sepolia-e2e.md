@@ -1,9 +1,46 @@
 # Anvil Base Sepolia Fork E2E (real Sumsub + real Gemini + x402 + ERC-8004)
 
-This flow runs the full protocol locally on an Anvil fork, with real external integrations (no KYB/LLM mocks).
+This flow runs the protocol on an Anvil Base Sepolia fork using **CRE local simulation** plus real external integrations (no KYB/LLM mocks).
+
+---
+
+## Anvil Account Map
+
+| # | Address | Private Key | Role |
+|---|---------|-------------|------|
+| 0 | `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266` | `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80` | **Deployer / Owner / CRE sender / Subject** |
+| 1 | `0x70997970C51812dc3A010C7d01b50e0d17dc79C8` | `0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d` | **x402 Buyer** (pays for KYB with forked USDC) |
+| 2 | `0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC` | `0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a` | Available (test user) |
+| 7 | `0x14dC79964da2C08dA15Fd353d30d9AA8CAF8a592` | `0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356` | Only clean EOA on Base Sepolia fork (no EIP-7702 code) |
+| derived | `0x4e767bE56A8e70759544831e6e1825c94f945cE3` | `0x741a86b698ac6e746fc8df15e352e4c148ad970618c1085bd92b76b58e2daba3` | **Agent Registrar** (derived from `keccak256("RWA_AGENT_REGISTRAR_PRIVATE_KEY_V1")`) |
+
+> **x402 Buyer must be Account #1** (`0x7099...`). It has forked USDC balance on Base Sepolia. Its EIP-7702 delegation code must be cleared before x402 payments work (see step 2.5).
+
+## Deployed Contract Addresses
+
+| Contract | Address |
+|----------|---------|
+| DemoUSD | `0xFF196F1e3a895404d073b8611252cF97388773A7` |
+| ComplianceRegistry | `0xC36E784E1dff616bDae4EAc7B310F0934FaF04a4` |
+| RWAComplianceReceiver | `0xB98E0Fb673e5a0C6e15F1D0a9f36E7dA954A0D5E` |
+| RWAVault | `0x78dA752e9dBD73a9b0C0F5ddD15e854D2B879524` |
+| DiligencePortal | `0x8071E429C7684fCe0250287F1578397142503241` |
+| IdentityRegistry | `0x1Cf34658E7Df9a46AD61486d007A8D62aeC9891e` |
+| ReputationRegistry | `0x33D10F2449Ffede92B43D4Fba562F132BA6A766A` |
+| ValidationRegistry | `0xB9818483D01ca0e721849703C58148CFb81328fC` |
+| USDC (forked) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+
+## ERC-8004 Agents
+
+| Agent ID | URI | Registered By |
+|----------|-----|---------------|
+| 1 | `ipfs://agents/rwa-diligence-reputation` | Agent Registrar |
+| 2 | `ipfs://agents/rwa-diligence-validator` | Agent Registrar |
+
+---
 
 ## 0) Prerequisites
-- `anvil`, `forge`, `cast`
+- `anvil`, `forge`, `cast` (Foundry)
 - `cre` CLI + `bun`
 - `services/kyb-provider/.env` filled with real Sumsub sandbox values
 - `cre/chainlink-Convergence/.env` filled with `GEMINI_API_KEY`
@@ -13,69 +50,95 @@ This flow runs the full protocol locally on an Anvil fork, with real external in
 anvil --fork-url https://sepolia.base.org --chain-id 84532 --host 127.0.0.1 --port 8545
 ```
 
-Use Anvil account #0 private key as:
-- deployer key (`PRIVATE_KEY`)
-- workflow sender key (`CRE_ETH_PRIVATE_KEY`)
+This gives you chain ID **84532** and 10 pre-funded accounts with 10000 ETH each.
 
-## 2) Configure KYB provider mode
-`services/kyb-provider/.env`:
+## 2) Configure environment files
+
+### `services/kyb-provider/.env`
 ```bash
 X402_ENABLED=true
 X402_NETWORK=base-sepolia
-X402_PAY_TO=0x<your_base_sepolia_wallet>
-KYB_PRICE=0.01
+X402_PAY_TO=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266       # Account #0 (deployer receives payment)
+X402_TIMEOUT_SECONDS=600
+X402_RELAYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80  # Account #0
+X402_RPC_URL=http://127.0.0.1:8545
+X402_EIP712_NAME=USDC
+X402_EIP712_VERSION=2
+
 SUMSUB_BASE_URL=https://api.sumsub.com
-SUMSUB_APP_TOKEN=...
-SUMSUB_SECRET_KEY=...
-SUMSUB_LEVEL_NAME=...
+SUMSUB_APP_TOKEN=<your_sumsub_app_token>
+SUMSUB_SECRET_KEY=<your_sumsub_secret_key>
+SUMSUB_LEVEL_NAME=<your_sumsub_level_name>
 ```
 
-For free-path smoke tests only, set `X402_ENABLED=false` and keep workflow `kybUrl` on `/kyb/free`.
+### `cre/chainlink-Convergence/.env`
+```bash
+CRE_ETH_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80   # Account #0 (deployer)
+GEMINI_API_KEY=<your_gemini_api_key>
+X402_BUYER_PRIVATE_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d  # Account #1 (buyer - has forked USDC)
+```
 
 ## 2.5) Clear EIP-7702 delegation code from Anvil accounts
 
-On Base Sepolia, several well-known Anvil accounts have EIP-7702 delegation
-designators (`0xef01…`) deployed at their addresses. This causes the USDC
-`SignatureChecker` to treat them as **contracts** rather than EOAs, making
-`transferWithAuthorization` / `permit` fail with "invalid signature".
+On Base Sepolia, well-known Anvil accounts have EIP-7702 delegation
+designators (`0xef01...`) at their addresses. This causes USDC
+`SignatureChecker` to treat them as **contracts** instead of EOAs, breaking
+`transferWithAuthorization`.
 
-Clear the code for the **actual buyer address** and deployer:
+Clear **all affected accounts** in one shot:
 
 ```bash
-# Resolve buyer from your configured x402 buyer private key
-export X402_BUYER_PRIVATE_KEY=0x<your_x402_buyer_private_key>
-export BUYER_ADDRESS=$(cast wallet address --private-key "$X402_BUYER_PRIVATE_KEY")
-
-# Buyer
-curl -s -X POST -H "Content-Type: application/json" \
-  --data '{"jsonrpc":"2.0","method":"anvil_setCode","params":["'"$BUYER_ADDRESS"'","0x"],"id":1}' \
-  http://127.0.0.1:8545
-
-# Deployer / relayer – account #0
-curl -s -X POST -H "Content-Type: application/json" \
-  --data '{"jsonrpc":"2.0","method":"anvil_setCode","params":["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266","0x"],"id":2}' \
-  http://127.0.0.1:8545
+for addr in \
+  0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
+  0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
+  0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC \
+  0x90F79bf6EB2c4f870365E785982E1f101E93b906 \
+  0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65 \
+  0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc \
+  0x976EA74026E726554dB657fA54763abd0C3a0aa9 \
+  0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f \
+  0xa0Ee7A142d267C1f36714E4a8F75612F20a79720; do
+  curl -s -X POST -H "Content-Type: application/json" \
+    --data '{"jsonrpc":"2.0","method":"anvil_setCode","params":["'"$addr"'","0x"],"id":1}' \
+    http://127.0.0.1:8545 > /dev/null
+done
+echo "Cleared all delegation code"
 ```
 
-Verify with `cast code <address> --rpc-url http://127.0.0.1:8545` — should return `0x`.
+Verify:
+```bash
+cast code 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --rpc-url http://127.0.0.1:8545  # => 0x
+cast code 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 --rpc-url http://127.0.0.1:8545  # => 0x
+```
+
+> **Note:** Account #7 (`0x14dC...`) is the only account already clean on Base Sepolia fork.
 
 ## 3) Deploy contracts to Anvil fork
 ```bash
+cd /Users/arunabha003/Documents/Projects/Chainlink-Converegence
+
 export RPC_URL=http://127.0.0.1:8545
 export PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 forge script script/Deploy.s.sol:Deploy --rpc-url "$RPC_URL" --broadcast
 ```
 
-## 4) Auto-wire CRE config with deployed addresses
+## 4) Auto-wire CRE config + sync secrets
 ```bash
 node tools/sync-cre-config.mjs --chain-id 84532 --config cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json
+node tools/sync-local-secrets-to-config.mjs
 ```
 
-## 5) Submit diligence request
+## 5) Sync frontend addresses
 ```bash
-export PORTAL_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="DiligencePortal") | .contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
+cd app && node scripts/sync-abis.mjs
+```
 
+## 6) Submit diligence request
+```bash
+cd /Users/arunabha003/Documents/Projects/Chainlink-Converegence
+
+export PORTAL_ADDRESS=$(jq -r '[.transactions[] | select(.contractName=="DiligencePortal")][0].contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
 export SUBJECT=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 export DOC_BUNDLE_HASH=0x1111111111111111111111111111111111111111111111111111111111111111
 export METADATA_URI=ipfs://rwa-docs/acme
@@ -83,37 +146,15 @@ export METADATA_URI=ipfs://rwa-docs/acme
 forge script script/SubmitRequest.s.sol:SubmitRequest --rpc-url "$RPC_URL" --broadcast
 ```
 
-Read the printed `RequestId`.
+Creates **requestId=1**.
 
-## 6) Start provider + validate Sumsub auth
+## 7) Start KYB provider
 ```bash
 cd services/kyb-provider
-npm install
-npm run check:sumsub
-npm run dev
+npm install && npm run dev
 ```
 
-Keep this terminal running.
-
-## 7) Configure CRE env for local simulation
-`cre/chainlink-Convergence/.env`:
-```bash
-CRE_ETH_PRIVATE_KEY=0x<anvil_account_0_private_key>
-GEMINI_API_KEY=<your_gemini_key>
-# required for paid x402 buyer flow
-X402_BUYER_PRIVATE_KEY=0x<base_sepolia_funded_buyer_key>
-```
-
-If `cre secrets` fails due `owner not linked`, set local fallback keys directly in
-`cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json`:
-- `geminiApiKey`
-- `x402BuyerPrivateKey` (required when `x402Enabled=true`)
-
-Recommended helper (copies from `cre/chainlink-Convergence/.env`):
-```bash
-cd /Users/arunabha003/Documents/Projects/Chainlink-Converegence
-node tools/sync-local-secrets-to-config.mjs
-```
+Verify: `curl -sf http://127.0.0.1:3001/healthz` -> `{"ok":true,"x402Enabled":true}`
 
 ## 8) Preflight checks
 ```bash
@@ -121,10 +162,13 @@ cd /Users/arunabha003/Documents/Projects/Chainlink-Converegence
 CRE_CONFIG_PATH=cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json RPC_URL=http://127.0.0.1:8545 node tools/readiness-check.mjs
 ```
 
-## 9) Run CRE workflow simulation (non-interactive)
+Should print: `Readiness check passed`.
+
+## 9) Run CRE workflow simulation
 ```bash
 cd cre/chainlink-Convergence
-cat > http-payload.local.json <<'EOF'
+
+cat > ../../http-payload.local.json <<'EOF'
 {
   "requestId": 1,
   "companyInfo": {
@@ -136,61 +180,129 @@ cat > http-payload.local.json <<'EOF'
 }
 EOF
 
-PAYLOAD=$(jq -c . ./http-payload.local.json)
-cre workflow simulate ./my-workflow --target anvil-e2e-settings --trigger-index 0 --http-payload "$PAYLOAD" --non-interactive -e .env
+PAYLOAD=$(jq -c . ../../http-payload.local.json)
+
+# Sync block timestamp
+CURRENT_TS=$(date +%s)
+curl -s -X POST -H "Content-Type: application/json" \
+  --data "{\"jsonrpc\":\"2.0\",\"method\":\"evm_setNextBlockTimestamp\",\"params\":[$CURRENT_TS],\"id\":1}" \
+  http://127.0.0.1:8545 > /dev/null
+curl -s -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"evm_mine","params":[],"id":2}' \
+  http://127.0.0.1:8545 > /dev/null
+
+cre workflow simulate ./my-workflow \
+  --target anvil-e2e-settings \
+  --trigger-index 0 \
+  --http-payload "$PAYLOAD" \
+  --non-interactive \
+  -e .env
 ```
 
-Notes:
-- Passing compact inline JSON (`$PAYLOAD`) avoids CLI path parsing quirks seen with `--http-payload ./file.json`.
-- If you see `Configured geminiModel=... unavailable. Retrying with model=...`, that fallback is expected.
+Expected in local simulate:
+- `Workflow Simulation Result` includes `txHash: "simulation-no-txhash"` (this is normal in local simulation mode).
 
-## 10) Verify protocol + ERC-8004 outcome onchain
+## 10) Verify on-chain outcome
 ```bash
-export REGISTRY_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="ComplianceRegistry") | .contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
-export VAULT_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="RWAVault") | .contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
-export ASSET_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="DemoUSD") | .contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
-export RECEIVER_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="RWAComplianceReceiver") | .contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
-export REPUTATION_REGISTRY=$(jq -r '.transactions[] | select(.contractName=="ReputationRegistry") | .contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
-export VALIDATION_REGISTRY=$(jq -r '.transactions[] | select(.contractName=="ValidationRegistry") | .contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
-export REPUTATION_AGENT_ID=$(cast call "$RECEIVER_ADDRESS" "reputationAgentId()(uint256)" --rpc-url "$RPC_URL")
-export VALIDATION_AGENT_ID=$(cast call "$RECEIVER_ADDRESS" "validationAgentId()(uint256)" --rpc-url "$RPC_URL")
+REGISTRY=0xC36E784E1dff616bDae4EAc7B310F0934FaF04a4
+SUBJECT=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 
-cast call "$REGISTRY_ADDRESS" "isApproved(address)(bool)" "$SUBJECT" --rpc-url "$RPC_URL"
-cast call "$REGISTRY_ADDRESS" "getRecord(address)((bool,uint32,bytes32,uint64))" "$SUBJECT" --rpc-url "$RPC_URL"
-cast send "$ASSET_ADDRESS" "approve(address,uint256)(bool)" "$VAULT_ADDRESS" 1000000 --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL"
-cast send "$VAULT_ADDRESS" "deposit(uint256,address)(uint256)" 1000000 "$SUBJECT" --private-key "$PRIVATE_KEY" --rpc-url "$RPC_URL"
-
-cast call "$REPUTATION_REGISTRY" "getLastIndex(uint256,address)(uint64)" "$REPUTATION_AGENT_ID" "$RECEIVER_ADDRESS" --rpc-url "$RPC_URL"
-cast call "$VALIDATION_REGISTRY" "getAgentValidations(uint256)(bytes32[])" "$VALIDATION_AGENT_ID" --rpc-url "$RPC_URL"
-
-# optional deep read
-export REPUTATION_CLIENT="$RECEIVER_ADDRESS"
-forge script script/ReadERC8004State.s.sol:ReadERC8004State --rpc-url "$RPC_URL"
+cast call $REGISTRY "isApproved(address)(bool)" $SUBJECT --rpc-url http://127.0.0.1:8545
+cast call $REGISTRY "getRecord(address)((bool,uint32,bytes32,uint64))" $SUBJECT --rpc-url http://127.0.0.1:8545
 ```
 
-Expected:
-- before workflow write: `isApproved=false`, deposit reverts
-- after workflow write: `isApproved=true`, deposit succeeds
-- local simulate may return `txHash=simulation-no-txhash` (or older zero-hash logs); rely on registry reads above for proof.
-- after workflow write, ERC-8004 reputation feedback and validation status are recorded by `RWAComplianceReceiver`.
-
-## 11) If x402 payment fails
-- Ensure `services/kyb-provider` is running with `X402_ENABLED=true`.
-- Ensure workflow config uses `/kyb` (not `/kyb/free`) and `x402Enabled=true`.
-- Ensure `X402_BUYER_PRIVATE_KEY` has spendable balance on Base Sepolia.
-- Verify provider returns `402` on first call and then `200` after buyer retry with `X-PAYMENT`.
-
-## 12) Force Sumsub sandbox outcome (for approve-path demo)
-If KYB stays `REJECTED`/pending, mark the sandbox applicant completed with `GREEN`:
+## 11) Force Sumsub sandbox outcome (for approve-path demo)
 ```bash
 curl -sS -X POST http://127.0.0.1:3001/kyb/free \
   -H 'content-type: application/json' \
-  -d '{"subject":"'"$SUBJECT"'","docBundleHash":"'"$DOC_BUNDLE_HASH"'","metadataUri":"'"$METADATA_URI"'","companyInfo":{"companyName":"Acme LLC","country":"USA"}}' | jq
+  -d '{"subject":"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266","docBundleHash":"0x1111111111111111111111111111111111111111111111111111111111111111","metadataUri":"ipfs://rwa-docs/acme","companyInfo":{"companyName":"Acme LLC","country":"USA"}}' | jq
 ```
-Copy `sumsub.applicantId` from response, then:
+Copy `sumsub.applicantId`, then:
 ```bash
 curl -sS -X POST http://127.0.0.1:3001/sumsub/sandbox/testCompleted \
   -H 'content-type: application/json' \
   -d '{"applicantId":"<APPLICANT_ID>","reviewAnswer":"GREEN"}' | jq
 ```
-Rerun step 9 and step 10.
+Rerun step 9 and 10.
+
+---
+
+## Frontend Testing
+
+### Start the frontend
+```bash
+cd app
+npm install    # first time only
+npm run dev    # starts on http://localhost:3000
+```
+
+### MetaMask Setup
+1. Open MetaMask -> Settings -> Networks.
+2. Prefer connecting from the app first (`Connect Wallet`), which auto-requests `wallet_addEthereumChain` / `wallet_switchEthereumChain` to chain `84532`.
+3. If MetaMask still uses stale `31337`, add a **new** network manually:
+   - **Network name:** Base Sepolia (Local Fork)
+   - **RPC URL:** http://127.0.0.1:8545
+   - **Chain ID:** 84532
+   - **Currency symbol:** ETH
+4. Import Account #0:
+   - Private key: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
+   - This is the deployer/owner with 1,000,000 dUSD and controls all admin functions
+
+### Test flows
+
+#### 1. Dashboard (`/`)
+- Connect wallet -> should see: Total Requests = 1, Vault TVL = 0, Agents = 2, contract addresses
+
+#### 2. Submit Request (`/submit`)
+- Subject: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`
+- Doc Bundle Hash: `0x2222222222222222222222222222222222222222222222222222222222222222`
+- Metadata URI: `ipfs://rwa-docs/test2`
+- Click Submit -> confirm in MetaMask
+
+#### 3. Compliance (`/compliance`)
+- Lookup `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`
+- Before CRE: NOT APPROVED, risk score 0
+- After CRE: APPROVED with risk score and attestation hash
+
+#### 4. Vault (`/vault`)
+- Mint dUSD -> Approve Vault -> Deposit (compliance-gated) -> Withdraw
+
+#### 5. Agents (`/agents`)
+- Browse: 2 bootstrap agents. Agent 1=REP, Agent 2=VAL
+- Register new agent, give feedback, request/respond validation
+
+---
+
+## After Anvil Restart (quick one-liner)
+```bash
+cd /Users/arunabha003/Documents/Projects/Chainlink-Converegence
+
+# Clear EIP-7702
+for addr in 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC 0x90F79bf6EB2c4f870365E785982E1f101E93b906 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65 0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc 0x976EA74026E726554dB657fA54763abd0C3a0aa9 0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f 0xa0Ee7A142d267C1f36714E4a8F75612F20a79720; do curl -s -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"method\":\"anvil_setCode\",\"params\":[\"$addr\",\"0x\"],\"id\":1}" http://127.0.0.1:8545 > /dev/null; done
+
+# Deploy + wire
+PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 forge script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadcast
+node tools/sync-cre-config.mjs --chain-id 84532 --config cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json
+node tools/sync-local-secrets-to-config.mjs
+cd app && node scripts/sync-abis.mjs && cd ..
+
+# Submit request + readiness
+export PORTAL_ADDRESS=$(jq -r '[.transactions[] | select(.contractName=="DiligencePortal")][0].contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
+export SUBJECT=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+export DOC_BUNDLE_HASH=0x1111111111111111111111111111111111111111111111111111111111111111
+export METADATA_URI=ipfs://rwa-docs/acme
+export RPC_URL=http://127.0.0.1:8545
+PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 forge script script/SubmitRequest.s.sol:SubmitRequest --rpc-url http://127.0.0.1:8545 --broadcast
+CRE_CONFIG_PATH=cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json RPC_URL=http://127.0.0.1:8545 node tools/readiness-check.mjs
+```
+
+## If x402 payment fails
+- Ensure `services/kyb-provider` is running with `X402_ENABLED=true`
+- Ensure Account #1 (`0x7099...`) EIP-7702 code is cleared (`cast code` returns `0x`)
+- `X402_BUYER_PRIVATE_KEY` = `0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d`
+- Sync block timestamp if needed: `curl -s -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"method\":\"evm_setNextBlockTimestamp\",\"params\":[$(date +%s)],\"id\":1}" http://127.0.0.1:8545`
+
+## If submit() fails with `invalid chain id for signer`
+- Wallet is signing on the wrong network (usually stale MetaMask network).
+- Switch wallet to chain `84532` and RPC `http://127.0.0.1:8545`.
+- In UI, use the **Switch network** button from the nav/submit page; then retry.
