@@ -155,6 +155,8 @@ const resolveAssetEip712 = async (network, assetAddress, fallback) => {
   return fallback
 }
 
+const forceApprove = String(process.env.FORCE_APPROVE || 'false').toLowerCase() === 'true'
+
 const sumsubEnabled =
   Boolean(process.env.SUMSUB_APP_TOKEN && process.env.SUMSUB_SECRET_KEY) ||
   Boolean(process.env.SUMSUB_APP_TOKEN && process.env.SUMSUB_SECRET)
@@ -336,6 +338,20 @@ const sumsubVerify = async (payload) => {
   const subject = payload?.subject
   if (!subject || typeof subject !== 'string') throw new Error('Missing subject (wallet address) in request body')
 
+  // ── Force-approve mode: skip Sumsub entirely, return APPROVED with high score ──
+  if (forceApprove) {
+    console.log(`[kyb-provider] FORCE_APPROVE=true → returning APPROVED for ${subject}`)
+    const responseHash = sha256Hex(
+      JSON.stringify({ subject, forceApproved: true, ts: Date.now() }),
+    )
+    return {
+      providerStatus: 'APPROVED',
+      providerScore: 10,
+      providerResponseHash: `0x${responseHash.padEnd(64, '0').slice(0, 64)}`,
+      sumsub: { applicantId: 'force-approved', reviewStatus: 'completed', reviewAnswer: 'GREEN' },
+    }
+  }
+
   const applicant =
     payload?.companyInfo && typeof payload.companyInfo === 'object'
       ? {
@@ -466,5 +482,5 @@ app.post('/sumsub/sandbox/testCompleted', async (req, res) => {
 
 app.listen(port, () => {
   // eslint-disable-next-line no-console
-  console.log(`[kyb-provider] listening on http://localhost:${port} (x402Enabled=${x402Enabled})`)
+  console.log(`[kyb-provider] listening on http://localhost:${port} (x402Enabled=${x402Enabled}, forceApprove=${forceApprove})`)
 })

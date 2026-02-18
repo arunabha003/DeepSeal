@@ -1,50 +1,67 @@
-# CRE Workflow (To Be Wired)
+# CRE Workflow — Confidential RWA Due-Diligence
 
-This folder will contain the Chainlink CRE workflow that:
-1) Calls a KYB/KYC / business verification step (mock for now; replace later with real provider)
-2) Calls Gemini for a strict JSON risk decision
-3) Writes the decision onchain to `RWAComplianceReceiver.onReport(metadata, report)` which updates `ComplianceRegistry`
+This folder contains the fully-implemented Chainlink CRE workflow that orchestrates the
+end-to-end compliance pipeline:
 
-## Important: local limitation
-In this Codex sandbox, DNS/network calls to `api.cre.chain.link` are blocked, so I cannot run `cre init` or simulate here.
-You can run the CRE CLI on your machine, then I’ll wire/commit the generated workflow files in this repo.
+1. **Reads** a diligence request from `DiligencePortal` on-chain (Base Sepolia)
+2. **Calls KYB provider** (Sumsub sandbox) via x402 micropayment rail
+3. **Calls Gemini AI** for structured risk scoring with model fallback
+4. **Writes** the decision on-chain to `RWAComplianceReceiver.onReport()` → updates `ComplianceRegistry` + triggers ERC-8004 agent side effects
 
-## Setup (run locally)
+## Key Files
 
-### A) Initialize project (TypeScript)
-Follow the official quickstart flow:
-- `cre init`
-  - Project name: `my-project`
-  - Language: TypeScript
-  - Template: “Custom Data Feed”
-  - Workflow name: `my-workflow`
-  - RPC URL: press Enter for default Sepolia (or paste your own)
+| File | Description |
+|------|-------------|
+| `chainlink-Convergence/my-workflow/main.ts` | 866-line CRE workflow (TypeScript) — the core logic |
+| `chainlink-Convergence/my-workflow/config.anvil-e2e.json` | Config for local Anvil fork simulation |
+| `chainlink-Convergence/my-workflow/config.staging.json` | Config for staging (real Base Sepolia) |
+| `chainlink-Convergence/project.yaml` | CRE project settings (RPC targets) |
+| `chainlink-Convergence/secrets.yaml` | CRE secrets config |
+| `abi/` | Exported ABIs for DiligencePortal, ComplianceRegistry, RWAComplianceReceiver |
+| `example-request.json` | Example trigger payload |
 
-Then:
-- `cd my-project`
-- `cre workflow simulate my-workflow`
+## How to Simulate
 
-### B) Secrets
-Add these as CRE secrets (do not commit them anywhere):
-- `GEMINI_API_KEY`
+```bash
+# 1. Start Anvil (Base Sepolia fork)
+anvil --fork-url https://sepolia.base.org --chain-id 84532 --host 127.0.0.1 --port 8545
 
-### C) Contracts the workflow writes to
-The workflow should write to the deployed `RWAComplianceReceiver`:
-- Function: `onReport(bytes metadata, bytes report)`
-- `report` ABI encoding: `(address subject, bool approved, uint32 riskScore, bytes32 attestationHash)`
-- `metadata`:
-  - Can be `0x` for simulation while `RWAComplianceReceiver.forwarder == 0` and workflow identity checks are disabled
-  - Later: set receiver `forwarder` + expected workflow identity to lock it down
+# 2. Deploy contracts
+forge script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadcast
 
-ABIs are exported for convenience:
-- `cre/abi/RWAComplianceReceiver.json`
-- `cre/abi/DiligencePortal.json`
-- `cre/abi/ComplianceRegistry.json`
+# 3. Submit a diligence request
+forge script script/SubmitRequest.s.sol:SubmitRequest --rpc-url http://127.0.0.1:8545 --broadcast
 
-### D) Trigger options
-Pick one (both are compatible with the onchain design):
-- **HTTP trigger**: easiest to demo; POST `{ subject, docBundleHash, metadataUri }`
-- **EVM log trigger**: listen to `DiligencePortal.DiligenceRequested(...)` and process requests as they come in
+# 4. Run CRE simulation
+cd cre/chainlink-Convergence
+PAYLOAD='{"requestId":1,"companyInfo":{"companyName":"Acme LLC","country":"USA","registrationNumber":"1234567"}}'
+cre workflow simulate ./my-workflow \
+  --target anvil-e2e-settings \
+  --trigger-index 0 \
+  --http-payload "$PAYLOAD" \
+  --non-interactive \
+  -e .env
+```
 
-## Expected input payload (from trigger)
-See `cre/example-request.json`.
+Or use the **frontend** — go to `http://localhost:3000/process`, enter a request ID, and click
+**Run CRE Workflow**. The frontend streams every step live via SSE and writes the result on-chain
+automatically.
+
+## Secrets
+
+Required secrets (set in `cre/chainlink-Convergence/.env` or CRE secrets manager):
+- `GEMINI_API_KEY` — Google Gemini API key for risk analysis
+
+Optional (for x402 paid KYB path):
+- `X402_BUYER_PRIVATE_KEY` — Wallet key to pay KYB provider via x402
+
+## Contracts the Workflow Writes To
+
+- **Function**: `RWAComplianceReceiver.onReport(bytes metadata, bytes report)`
+- **Report encoding**: `(address subject, bool approved, uint32 riskScore, bytes32 attestationHash)`
+- **Effect**: Updates `ComplianceRegistry` + triggers ERC-8004 reputation/validation + optional EAS attestation
+
+## Trigger Options
+
+- **HTTP trigger** (default): POST `{ requestId, companyInfo }` — used by the frontend
+- **EVM log trigger**: Listen to `DiligencePortal.DiligenceRequested(...)` for production use

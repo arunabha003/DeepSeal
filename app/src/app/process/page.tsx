@@ -1,0 +1,237 @@
+"use client";
+
+import { Suspense, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useReadContract } from "wagmi";
+import { ADDRESSES } from "@/lib/addresses";
+import { DiligencePortalABI } from "@/lib/abis";
+import { Card, CardTitle, Badge, Button } from "@/components/ui";
+import { WorkflowMonitor } from "@/components/workflow-monitor";
+import Link from "next/link";
+
+function ProcessContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const initialId = searchParams.get("id") || "";
+  const [requestId, setRequestId] = useState(initialId);
+  const [activeId, setActiveId] = useState(initialId ? Number(initialId) : 0);
+
+  /* company info form state */
+  const [companyName, setCompanyName] = useState("Acme LLC");
+  const [country, setCountry] = useState("USA");
+  const [registrationNumber, setRegistrationNumber] = useState("1234567");
+  const [website, setWebsite] = useState("https://acme.example");
+
+  /* read the request from chain to show summary */
+  const { data: requestData } = useReadContract({
+    address: ADDRESSES.DiligencePortal as `0x${string}`,
+    abi: DiligencePortalABI,
+    functionName: "getRequest",
+    args: activeId > 0 ? [BigInt(activeId)] : undefined,
+    query: { enabled: activeId > 0 },
+  });
+
+  const { data: nextRequestId } = useReadContract({
+    address: ADDRESSES.DiligencePortal as `0x${string}`,
+    abi: DiligencePortalABI,
+    functionName: "nextRequestId",
+  });
+
+  const req = requestData as
+    | {
+        requester: string;
+        subject: string;
+        docBundleHash: string;
+        metadataUri: string;
+        requestedAt: bigint;
+      }
+    | undefined;
+
+  const maxId = nextRequestId ? Number(nextRequestId) - 1 : 0;
+
+  const handleLoadRequest = (e: React.FormEvent) => {
+    e.preventDefault();
+    const id = Number(requestId);
+    if (id > 0 && id <= maxId) {
+      setActiveId(id);
+      router.replace(`/process?id=${id}`, { scroll: false });
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-white">
+          Process Request
+        </h1>
+        <p className="text-sm text-muted mt-1">
+          Run the CRE workflow to process a diligence request — watch every step live
+        </p>
+      </div>
+
+      {/* ── Select request ────────────────────────────────── */}
+      <Card>
+        <CardTitle>Select Request to Process</CardTitle>
+        <form onSubmit={handleLoadRequest} className="flex gap-3 items-end">
+          <div className="flex-1">
+            <label className="block text-xs text-muted mb-1.5">Request ID</label>
+            <input
+              type="number"
+              min={1}
+              max={maxId || undefined}
+              value={requestId}
+              onChange={(e) => setRequestId(e.target.value)}
+              placeholder={`1 – ${maxId}`}
+              className="w-full font-mono"
+            />
+          </div>
+          <Button type="submit">Load</Button>
+        </form>
+        {maxId > 0 && (
+          <p className="text-[11px] text-muted mt-2">
+            {maxId} request{maxId > 1 ? "s" : ""} submitted.{" "}
+            <Link href="/submit" className="text-accent hover:underline">
+              Submit a new one →
+            </Link>
+          </p>
+        )}
+      </Card>
+
+      {/* ── Request summary ───────────────────────────────── */}
+      {req && activeId > 0 && (
+        <Card>
+          <CardTitle>Request #{activeId} — On-Chain Data</CardTitle>
+          <div className="grid grid-cols-2 gap-4 text-xs">
+            <div>
+              <span className="text-muted block mb-0.5">Subject</span>
+              <code className="font-mono text-zinc-300 break-all">
+                {req.subject}
+              </code>
+            </div>
+            <div>
+              <span className="text-muted block mb-0.5">Requester</span>
+              <code className="font-mono text-zinc-400 break-all">
+                {req.requester}
+              </code>
+            </div>
+            <div>
+              <span className="text-muted block mb-0.5">Metadata URI</span>
+              <code className="font-mono text-zinc-400">{req.metadataUri}</code>
+            </div>
+            <div>
+              <span className="text-muted block mb-0.5">Doc Bundle Hash</span>
+              <code className="font-mono text-zinc-400">
+                {req.docBundleHash.slice(0, 14)}...
+              </code>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* ── Company info for KYB ──────────────────────────── */}
+      {req && activeId > 0 && (
+        <Card>
+          <CardTitle>Company Info (sent to KYB provider)</CardTitle>
+          <p className="text-[11px] text-muted mb-3">
+            This data is passed to the Sumsub KYB provider via the CRE workflow HTTP trigger.
+            It is NOT stored on-chain — only the compliance decision is.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-muted mb-1">Company Name</label>
+              <input
+                type="text"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className="w-full text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Country</label>
+              <input
+                type="text"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                className="w-full text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">
+                Registration #
+              </label>
+              <input
+                type="text"
+                value={registrationNumber}
+                onChange={(e) => setRegistrationNumber(e.target.value)}
+                className="w-full text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Website</label>
+              <input
+                type="text"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                className="w-full text-sm"
+              />
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* ── Workflow monitor ──────────────────────────────── */}
+      {activeId > 0 && req && (
+        <WorkflowMonitor
+          requestId={activeId}
+          companyInfo={{
+            companyName,
+            country,
+            registrationNumber,
+            website,
+          }}
+          onComplete={() => {
+            // Could auto-navigate to compliance page
+          }}
+        />
+      )}
+
+      {/* ── Post-run links ────────────────────────────────── */}
+      {activeId > 0 && (
+        <div className="flex gap-3 text-xs">
+          <Link
+            href="/compliance"
+            className="text-accent hover:underline"
+          >
+            View compliance record →
+          </Link>
+          <Link
+            href="/vault"
+            className="text-accent hover:underline"
+          >
+            Vault operations →
+          </Link>
+          <Link
+            href="/agents"
+            className="text-accent hover:underline"
+          >
+            ERC-8004 agents →
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ProcessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-3xl mx-auto py-20 text-center text-muted text-sm">
+          Loading...
+        </div>
+      }
+    >
+      <ProcessContent />
+    </Suspense>
+  );
+}

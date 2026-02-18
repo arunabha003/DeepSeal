@@ -18,6 +18,7 @@ import { ADDRESSES } from "@/lib/addresses";
 const links = [
   { href: "/", label: "Dashboard" },
   { href: "/submit", label: "Submit Request" },
+  { href: "/process", label: "Process" },
   { href: "/compliance", label: "Compliance" },
   { href: "/vault", label: "Vault" },
   { href: "/agents", label: "Agents" },

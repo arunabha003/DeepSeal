@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   useAccount,
   useChainId,
@@ -14,6 +15,7 @@ import { ADDRESSES } from "@/lib/addresses";
 import { DiligencePortalABI } from "@/lib/abis";
 import { Card, CardTitle, Button, Badge } from "@/components/ui";
 import { anvilBaseSepolia } from "@/lib/wagmi";
+import Link from "next/link";
 
 export default function SubmitPage() {
   const { address, isConnected } = useAccount();
@@ -166,7 +168,7 @@ export default function SubmitPage() {
           )}
 
           {isConfirmed && txHash && (
-            <div className="p-4 rounded-md bg-success/10 border border-success/20 space-y-2">
+            <div className="p-4 rounded-md bg-success/10 border border-success/20 space-y-3">
               <div className="flex items-center gap-2">
                 <Badge variant="success">Confirmed</Badge>
                 <span className="text-sm text-zinc-300">
@@ -176,6 +178,17 @@ export default function SubmitPage() {
               <p className="text-xs font-mono text-muted break-all">
                 tx: {txHash}
               </p>
+              <div className="pt-1 border-t border-success/10">
+                <p className="text-xs text-zinc-400 mb-2">
+                  Request is on-chain. Now run the CRE workflow to process it:
+                </p>
+                <Link
+                  href={`/process?id=${nextRequestId ? Number(nextRequestId) - 1 : ""}`}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-accent text-white hover:bg-accent/90 transition-colors"
+                >
+                  ▶ Process with CRE Workflow →
+                </Link>
+              </div>
             </div>
           )}
         </form>

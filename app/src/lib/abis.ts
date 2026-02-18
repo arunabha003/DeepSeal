@@ -499,6 +499,16 @@ export const ValidationRegistryABI = [
 export const RWAComplianceReceiverABI = [
   {
     type: "function",
+    name: "onReport",
+    inputs: [
+      { name: "metadata", type: "bytes" },
+      { name: "report", type: "bytes" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
     name: "reputationAgentId",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],

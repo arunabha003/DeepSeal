@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   useReadContract,
   useReadContracts,
@@ -17,6 +17,17 @@ import {
 } from "@/lib/abis";
 import { Card, CardTitle, Stat, Badge, Button } from "@/components/ui";
 import { formatUnits, truncAddr } from "@/lib/utils";
+
+/* helper: safely parse a token amount — returns null on bad input */
+function safeParse(value: string, decimals: number): bigint | null {
+  try {
+    if (!value || value.trim() === "" || Number.isNaN(Number(value)) || Number(value) < 0)
+      return null;
+    return parseUnits(value, decimals);
+  } catch {
+    return null;
+  }
+}
 
 const VAULT = ADDRESSES.RWAVault as `0x${string}`;
 const DUSD = ADDRESSES.DemoUSD as `0x${string}`;
@@ -161,8 +172,8 @@ export default function VaultPage() {
           <div className="grid md:grid-cols-2 gap-4">
             <MintDUSD />
             <ApproveCard allowance={allowance} />
-            <DepositCard />
-            <WithdrawCard />
+            <DepositCard dUsdBal={dUsdBal} allowance={allowance} isApproved={isApproved} />
+            <WithdrawCard sharesBal={sharesBal} isApproved={isApproved} vaultDecimals={vaultDecimals} />
           </div>
         </>
       )}
@@ -174,10 +185,22 @@ export default function VaultPage() {
 function MintDUSD() {
   const { address } = useAccount();
   const [amt, setAmt] = useState("");
-  const { writeContract, data: hash, isPending } = useWriteContract();
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
+
+  const handleMint = useCallback(() => {
+    const parsed = safeParse(amt, 6);
+    if (!parsed || !address) return;
+    reset();
+    writeContract({
+      address: DUSD,
+      abi: DemoUSDABI,
+      functionName: "mint",
+      args: [address, parsed],
+    });
+  }, [amt, address, writeContract, reset]);
 
   return (
     <Card>
@@ -186,27 +209,26 @@ function MintDUSD() {
       <div className="flex gap-2">
         <input
           type="text"
-          placeholder="Amount"
+          inputMode="decimal"
+          placeholder="Amount (e.g. 10000)"
           value={amt}
-          onChange={(e) => setAmt(e.target.value)}
+          onChange={(e) => { setAmt(e.target.value); if (error) reset(); }}
           className="flex-1 font-mono"
         />
         <Button
-          disabled={isPending || confirming || !amt}
-          onClick={() =>
-            writeContract({
-              address: DUSD,
-              abi: DemoUSDABI,
-              functionName: "mint",
-              args: [address!, parseUnits(amt, 6)],
-            })
-          }
+          disabled={isPending || confirming || !safeParse(amt, 6)}
+          onClick={handleMint}
         >
-          {confirming ? "Confirming..." : isPending ? "Signing..." : "Mint"}
+          {confirming ? "Confirming…" : isPending ? "Signing…" : "Mint"}
         </Button>
       </div>
       {isSuccess && (
-        <p className="text-xs text-success mt-2">Minted {amt} dUSD</p>
+        <p className="text-xs text-success mt-2">✓ Minted {amt} dUSD</p>
+      )}
+      {error && (
+        <p className="text-xs text-danger mt-2 break-all">
+          {(error as any).shortMessage || error.message}
+        </p>
       )}
     </Card>
   );
@@ -215,10 +237,22 @@ function MintDUSD() {
 /* ───────────────────────────────── Approve ────────── */
 function ApproveCard({ allowance }: { allowance: bigint }) {
   const [amt, setAmt] = useState("");
-  const { writeContract, data: hash, isPending } = useWriteContract();
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
+
+  const handleApprove = useCallback(() => {
+    const parsed = safeParse(amt, 6);
+    if (!parsed) return;
+    reset();
+    writeContract({
+      address: DUSD,
+      abi: DemoUSDABI,
+      functionName: "approve",
+      args: [VAULT, parsed],
+    });
+  }, [amt, writeContract, reset]);
 
   return (
     <Card>
@@ -229,69 +263,105 @@ function ApproveCard({ allowance }: { allowance: bigint }) {
       <div className="flex gap-2">
         <input
           type="text"
-          placeholder="Amount"
+          inputMode="decimal"
+          placeholder="Amount (e.g. 10000)"
           value={amt}
-          onChange={(e) => setAmt(e.target.value)}
+          onChange={(e) => { setAmt(e.target.value); if (error) reset(); }}
           className="flex-1 font-mono"
         />
         <Button
-          disabled={isPending || confirming || !amt}
-          onClick={() =>
-            writeContract({
-              address: DUSD,
-              abi: DemoUSDABI,
-              functionName: "approve",
-              args: [VAULT, parseUnits(amt, 6)],
-            })
-          }
+          disabled={isPending || confirming || !safeParse(amt, 6)}
+          onClick={handleApprove}
         >
-          {confirming ? "Confirming..." : isPending ? "Signing..." : "Approve"}
+          {confirming ? "Confirming…" : isPending ? "Signing…" : "Approve"}
         </Button>
       </div>
       {isSuccess && (
-        <p className="text-xs text-success mt-2">Approved {amt} dUSD</p>
+        <p className="text-xs text-success mt-2">✓ Approved {amt} dUSD for vault</p>
+      )}
+      {error && (
+        <p className="text-xs text-danger mt-2 break-all">
+          {(error as any).shortMessage || error.message}
+        </p>
       )}
     </Card>
   );
 }
 
 /* ───────────────────────────────── Deposit ────────── */
-function DepositCard() {
+function DepositCard({
+  dUsdBal,
+  allowance,
+  isApproved,
+}: {
+  dUsdBal: bigint;
+  allowance: bigint;
+  isApproved: boolean;
+}) {
   const { address } = useAccount();
   const [amt, setAmt] = useState("");
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
 
+  const parsed = safeParse(amt, 6);
+  const maxDeposit = allowance < dUsdBal ? allowance : dUsdBal;
+  const exceedsAllowance = parsed !== null && parsed > allowance;
+  const exceedsBalance = parsed !== null && parsed > dUsdBal;
+
+  const handleDeposit = useCallback(() => {
+    if (!parsed || !address) return;
+    reset();
+    writeContract({
+      address: VAULT,
+      abi: RWAVaultABI,
+      functionName: "deposit",
+      args: [parsed, address],
+    });
+  }, [parsed, address, writeContract, reset]);
+
   return (
     <Card>
       <CardTitle>Deposit dUSD</CardTitle>
-      <p className="text-xs text-muted mb-3">Receive vault shares (compliance-gated)</p>
+      <p className="text-xs text-muted mb-1">Receive vault shares (compliance-gated)</p>
+      <p className="text-xs text-muted mb-3">
+        Max: {formatUnits(maxDeposit, 6)} dUSD (allowance: {formatUnits(allowance, 6)})
+      </p>
       <div className="flex gap-2">
         <input
           type="text"
-          placeholder="Amount"
+          inputMode="decimal"
+          placeholder="Amount (e.g. 1000)"
           value={amt}
-          onChange={(e) => setAmt(e.target.value)}
+          onChange={(e) => { setAmt(e.target.value); if (error) reset(); }}
           className="flex-1 font-mono"
         />
-        <Button
-          disabled={isPending || confirming || !amt}
-          onClick={() =>
-            writeContract({
-              address: VAULT,
-              abi: RWAVaultABI,
-              functionName: "deposit",
-              args: [parseUnits(amt, 6), address!],
-            })
-          }
+        <button
+          type="button"
+          onClick={() => setAmt(formatUnits(maxDeposit, 6))}
+          className="text-[10px] text-accent hover:text-accent/80 px-1"
         >
-          {confirming ? "Confirming..." : isPending ? "Signing..." : "Deposit"}
+          MAX
+        </button>
+        <Button
+          disabled={isPending || confirming || !parsed || parsed === 0n || exceedsBalance || exceedsAllowance || !isApproved}
+          onClick={handleDeposit}
+        >
+          {confirming ? "Confirming…" : isPending ? "Signing…" : "Deposit"}
         </Button>
       </div>
+      {!isApproved && (
+        <p className="text-xs text-warning mt-2">⚠ Compliance not approved — run CRE workflow first</p>
+      )}
+      {exceedsAllowance && !exceedsBalance && (
+        <p className="text-xs text-warning mt-2">⚠ Exceeds vault allowance — approve more dUSD first</p>
+      )}
+      {exceedsBalance && (
+        <p className="text-xs text-warning mt-2">⚠ Exceeds your dUSD balance</p>
+      )}
       {isSuccess && (
-        <p className="text-xs text-success mt-2">Deposited {amt} dUSD</p>
+        <p className="text-xs text-success mt-2">✓ Deposited {amt} dUSD into vault</p>
       )}
       {error && (
         <p className="text-xs text-danger mt-2 break-all">
@@ -303,47 +373,80 @@ function DepositCard() {
 }
 
 /* ───────────────────────────────── Withdraw ───────── */
-function WithdrawCard() {
+function WithdrawCard({
+  sharesBal,
+  isApproved,
+  vaultDecimals,
+}: {
+  sharesBal: bigint;
+  isApproved: boolean;
+  vaultDecimals: number;
+}) {
   const { address } = useAccount();
   const [amt, setAmt] = useState("");
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
 
+  const parsed = safeParse(amt, 6);
+
+  const handleWithdraw = useCallback(() => {
+    if (!parsed || !address) return;
+    reset();
+    writeContract({
+      address: VAULT,
+      abi: RWAVaultABI,
+      functionName: "withdraw",
+      args: [parsed, address, address],
+    });
+  }, [parsed, address, writeContract, reset]);
+
   return (
     <Card>
       <CardTitle>Withdraw</CardTitle>
-      <p className="text-xs text-muted mb-3">Burn shares, receive dUSD (compliance-gated)</p>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Assets to withdraw"
-          value={amt}
-          onChange={(e) => setAmt(e.target.value)}
-          className="flex-1 font-mono"
-        />
-        <Button
-          disabled={isPending || confirming || !amt}
-          onClick={() =>
-            writeContract({
-              address: VAULT,
-              abi: RWAVaultABI,
-              functionName: "withdraw",
-              args: [parseUnits(amt, 6), address!, address!],
-            })
-          }
-        >
-          {confirming ? "Confirming..." : isPending ? "Signing..." : "Withdraw"}
-        </Button>
-      </div>
-      {isSuccess && (
-        <p className="text-xs text-success mt-2">Withdrawn {amt} dUSD</p>
-      )}
-      {error && (
-        <p className="text-xs text-danger mt-2 break-all">
-          {(error as any).shortMessage || error.message}
+      <p className="text-xs text-muted mb-1">Burn shares, receive dUSD</p>
+      <p className="text-xs text-muted mb-3">
+        Your shares: {formatUnits(sharesBal, vaultDecimals)}
+      </p>
+      {sharesBal === 0n ? (
+        <p className="text-xs text-warning">
+          You have 0 vault shares. Deposit dUSD first to receive shares, then withdraw.
         </p>
+      ) : (
+        <>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="dUSD to withdraw"
+              value={amt}
+              onChange={(e) => { setAmt(e.target.value); if (error) reset(); }}
+              className="flex-1 font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => setAmt(formatUnits(sharesBal, vaultDecimals))}
+              className="text-[10px] text-accent hover:text-accent/80 px-1"
+            >
+              MAX
+            </button>
+            <Button
+              disabled={isPending || confirming || !parsed || parsed === 0n}
+              onClick={handleWithdraw}
+            >
+              {confirming ? "Confirming…" : isPending ? "Signing…" : "Withdraw"}
+            </Button>
+          </div>
+          {isSuccess && (
+            <p className="text-xs text-success mt-2">✓ Withdrawn {amt} dUSD from vault</p>
+          )}
+          {error && (
+            <p className="text-xs text-danger mt-2 break-all">
+              {(error as any).shortMessage || error.message}
+            </p>
+          )}
+        </>
       )}
     </Card>
   );

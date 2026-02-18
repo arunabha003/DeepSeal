@@ -4,6 +4,8 @@
 /lib/**/.git
 .DS_Store
 .env
+*.env.local
+http-payload.local.json
 plan.md
 STATUS.md
 **/node_modules/

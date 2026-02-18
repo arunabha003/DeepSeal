@@ -238,9 +238,15 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
     function _toReputationValue(bool approved, uint32 riskScore) internal pure returns (int128) {
         uint256 bounded = riskScore > 1000 ? 1000 : uint256(riskScore);
         if (approved) {
+            // Approved: reward LOW risk (good decision to approve safe company)
+            // riskScore=150 → +850 (great approval)
+            // riskScore=800 → +200 (risky approval)
             return int128(int256(1000 - bounded));
         }
-        return -int128(int256(bounded));
+        // Rejected: reward HIGH risk (good decision to reject dangerous company)
+        // riskScore=950 → +450 (caught a bad actor)
+        // riskScore=150 → -350 (false positive, rejected a safe company)
+        return int128(int256(bounded)) - 500;
     }
 
     function _toValidationResponse(bool approved, uint32 riskScore) internal pure returns (uint8) {

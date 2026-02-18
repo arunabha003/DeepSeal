@@ -1,0 +1,543 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+
+/* ── Types ───────────────────────────────────────────────────────────── */
+type StepStatus = "pending" | "running" | "complete" | "error";
+
+interface StepData {
+  id: string;
+  status: StepStatus;
+  label: string;
+  detail: string;
+  data?: Record<string, unknown>;
+}
+
+interface LogEntry {
+  raw: string;
+  ts: string;
+}
+
+interface WorkflowMonitorProps {
+  requestId: number;
+  companyInfo?: {
+    companyName: string;
+    country: string;
+    registrationNumber?: string;
+    website?: string;
+  };
+  onComplete?: (result: Record<string, unknown>) => void;
+}
+
+/* ── Step definitions (pipeline order) ───────────────────────────────── */
+const PIPELINE: { id: string; label: string }[] = [
+  { id: "payload", label: "Preparing Payload" },
+  { id: "timestamp", label: "Syncing Block Timestamp" },
+  { id: "cre-init", label: "CRE Workflow Engine" },
+  { id: "read-request", label: "Reading On-Chain Request" },
+  { id: "kyb", label: "KYB Verification (Sumsub via x402)" },
+  { id: "gemini", label: "AI Risk Assessment (Gemini)" },
+  { id: "decision", label: "Final Decision" },
+  { id: "write-report", label: "Writing Report (CRE Simulator)" },
+  { id: "onchain-write", label: "Broadcasting On-Chain (onReport)" },
+  { id: "side-effects", label: "On-Chain Side Effects" },
+];
+
+/* ── Component ───────────────────────────────────────────────────────── */
+export function WorkflowMonitor({
+  requestId,
+  companyInfo,
+  onComplete,
+}: WorkflowMonitorProps) {
+  const [steps, setSteps] = useState<Map<string, StepData>>(new Map());
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [simResult, setSimResult] = useState<Record<string, unknown> | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isDone, setIsDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const logEndRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => logEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+  }, []);
+
+  const run = useCallback(async () => {
+    setIsRunning(true);
+    setIsDone(false);
+    setError(null);
+    setSimResult(null);
+    setSteps(new Map());
+    setLogs([]);
+
+    const abort = new AbortController();
+    abortRef.current = abort;
+
+    try {
+      const res = await fetch("/api/workflow/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId, companyInfo }),
+        signal: abort.signal,
+      });
+
+      if (!res.ok || !res.body) {
+        setError(`API returned ${res.status}`);
+        setIsRunning(false);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+
+        for (const part of parts) {
+          const eventMatch = part.match(/^event: (\S+)/m);
+          const dataMatch = part.match(/^data: (.+)/m);
+          if (!eventMatch || !dataMatch) continue;
+
+          const event = eventMatch[1];
+          let data: Record<string, unknown>;
+          try {
+            data = JSON.parse(dataMatch[1]);
+          } catch {
+            continue;
+          }
+
+          switch (event) {
+            case "step": {
+              const s = data as unknown as StepData;
+              setSteps((prev) => {
+                const next = new Map(prev);
+                next.set(s.id, s);
+                return next;
+              });
+              break;
+            }
+            case "log": {
+              const l = data as unknown as LogEntry;
+              setLogs((prev) => [...prev, l]);
+              scrollToBottom();
+              break;
+            }
+            case "result":
+              setSimResult(data);
+              break;
+            case "error":
+              setError(String(data.message));
+              break;
+            case "done":
+              setIsDone(true);
+              setIsRunning(false);
+              if (onComplete && simResult) onComplete(simResult);
+              break;
+          }
+        }
+      }
+    } catch (err: unknown) {
+      if ((err as Error).name !== "AbortError") {
+        setError((err as Error).message || String(err));
+      }
+    } finally {
+      setIsRunning(false);
+    }
+  }, [requestId, companyInfo, onComplete, scrollToBottom, simResult]);
+
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+    setIsRunning(false);
+  }, []);
+
+  /* ── Derive step display ─────────────────────────────────────────── */
+  const getStepState = (id: string): StepData | undefined => steps.get(id);
+
+  return (
+    <div className="space-y-4">
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-accent animate-pulse" />
+            CRE Workflow — Request #{requestId}
+          </h2>
+          <p className="text-xs text-muted mt-0.5">
+            Chainlink CRE off-chain computation → Sumsub KYB → Gemini AI → on-chain write
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {!isRunning && !isDone && (
+            <button
+              onClick={run}
+              className="px-4 py-2 rounded-md text-sm font-medium bg-accent text-white hover:bg-accent/90 transition-colors"
+            >
+              ▶ Run Workflow
+            </button>
+          )}
+          {isRunning && (
+            <button
+              onClick={cancel}
+              className="px-4 py-2 rounded-md text-sm font-medium bg-danger/10 text-danger hover:bg-danger/20 transition-colors"
+            >
+              ■ Cancel
+            </button>
+          )}
+          {isDone && (
+            <button
+              onClick={run}
+              className="px-4 py-2 rounded-md text-sm font-medium bg-surface-3 text-zinc-300 hover:bg-surface-4 transition-colors"
+            >
+              ↻ Re-run
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Pipeline steps ─────────────────────────────────────────── */}
+      <div className="bg-surface-1 border border-surface-3 rounded-lg overflow-hidden">
+        <div className="px-4 py-3 border-b border-surface-3 flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
+            Pipeline
+          </span>
+          {isRunning && (
+            <span className="text-[10px] font-mono text-accent animate-pulse">
+              processing...
+            </span>
+          )}
+          {isDone && !error && (
+            <span className="text-[10px] font-mono text-success">
+              ✓ complete
+            </span>
+          )}
+          {error && (
+            <span className="text-[10px] font-mono text-danger">
+              ✕ error
+            </span>
+          )}
+        </div>
+        <div className="divide-y divide-surface-3/50">
+          {PIPELINE.map((p) => {
+            const step = getStepState(p.id);
+            const status: StepStatus = step?.status || "pending";
+            const label = step?.label || p.label;
+            const detail = step?.detail || "";
+
+            return (
+              <div
+                key={p.id}
+                className={cn(
+                  "px-4 py-3 flex items-start gap-3 transition-colors duration-300",
+                  status === "running" && "bg-accent/5",
+                  status === "complete" && "bg-success/[0.02]",
+                  status === "error" && "bg-danger/5"
+                )}
+              >
+                {/* Status icon */}
+                <div className="mt-0.5 flex-shrink-0">
+                  {status === "pending" && (
+                    <div className="w-5 h-5 rounded-full border border-surface-4 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-surface-4" />
+                    </div>
+                  )}
+                  {status === "running" && (
+                    <div className="w-5 h-5 rounded-full border-2 border-accent flex items-center justify-center animate-spin">
+                      <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+                    </div>
+                  )}
+                  {status === "complete" && (
+                    <div className="w-5 h-5 rounded-full bg-success/20 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                  {status === "error" && (
+                    <div className="w-5 h-5 rounded-full bg-danger/20 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <p
+                    className={cn(
+                      "text-sm font-medium",
+                      status === "pending" && "text-zinc-500",
+                      status === "running" && "text-accent",
+                      status === "complete" && "text-zinc-200",
+                      status === "error" && "text-danger"
+                    )}
+                  >
+                    {label}
+                  </p>
+                  {detail && (
+                    <p className="text-xs text-muted mt-0.5 font-mono break-all">
+                      {detail}
+                    </p>
+                  )}
+
+                  {/* KYB data card */}
+                  {step?.data && p.id === "kyb" && (
+                    <div className="mt-2 p-2.5 rounded bg-surface-2/50 border border-surface-3/50 grid grid-cols-3 gap-3 text-[11px]">
+                      <div>
+                        <span className="text-muted block">Provider</span>
+                        <span className="font-mono text-white">Sumsub</span>
+                      </div>
+                      <div>
+                        <span className="text-muted block">Status</span>
+                        <span
+                          className={cn(
+                            "font-mono font-bold",
+                            step.data.providerStatus === "APPROVED"
+                              ? "text-success"
+                              : "text-danger"
+                          )}
+                        >
+                          {String(step.data.providerStatus)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted block">x402 Payment</span>
+                        <span className="font-mono text-accent">
+                          {step.data.x402Payment ? "✓ USDC paid" : "free"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Gemini data card */}
+                  {step?.data && p.id === "gemini" && (
+                    <div className="mt-2 space-y-2">
+                      <div className="p-2.5 rounded bg-surface-2/50 border border-surface-3/50 grid grid-cols-2 gap-3 text-[11px]">
+                        <div>
+                          <span className="text-muted block">Gemini Says</span>
+                          <span
+                            className={cn(
+                              "font-mono font-bold",
+                              step.data.geminiApproved
+                                ? "text-success"
+                                : "text-danger"
+                            )}
+                          >
+                            {step.data.geminiApproved
+                              ? "APPROVE"
+                              : "REJECT"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted block">Risk Score</span>
+                          <span className="font-mono text-white">
+                            {String(step.data.geminiRiskScore)} / 1000
+                          </span>
+                        </div>
+                      </div>
+                      {Array.isArray(step.data.reasons) &&
+                        (step.data.reasons as string[]).length > 0 && (
+                          <div className="p-2.5 rounded bg-surface-2/50 border border-surface-3/50 text-[11px]">
+                            <span className="text-muted block mb-1">
+                              AI Reasons
+                            </span>
+                            <ul className="space-y-0.5">
+                              {(step.data.reasons as string[]).map(
+                                (r, i) => (
+                                  <li
+                                    key={i}
+                                    className="text-zinc-400 font-mono flex gap-1.5"
+                                  >
+                                    <span className="text-accent/60">→</span>
+                                    {r}
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          </div>
+                        )}
+                    </div>
+                  )}
+
+                  {/* Decision data card */}
+                  {step?.data && p.id === "decision" && (
+                    <div className="mt-2 p-2.5 rounded bg-surface-2/50 border border-surface-3/50 grid grid-cols-2 gap-3 text-[11px]">
+                      <div>
+                        <span className="text-muted block">
+                          Final Verdict
+                        </span>
+                        <span
+                          className={cn(
+                            "font-mono font-bold text-base",
+                            step.data.approved
+                              ? "text-success"
+                              : "text-danger"
+                          )}
+                        >
+                          {step.data.approved ? "✓ APPROVED" : "✕ REJECTED"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted block">
+                          Combined Risk
+                        </span>
+                        <span className="font-mono font-bold text-base text-white">
+                          {String(step.data.riskScore)} / 1000
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* On-chain write data card */}
+                  {step?.data && p.id === "onchain-write" && (
+                    <div className="mt-2 p-2.5 rounded bg-surface-2/50 border border-surface-3/50 text-[11px] space-y-1">
+                      {step.data.txHash ? (
+                        <div className="flex gap-2">
+                          <span className="text-muted w-14">TX</span>
+                          <span className="font-mono text-accent break-all">
+                            {String(step.data.txHash)}
+                          </span>
+                        </div>
+                      ) : null}
+                      {step.data.blockNumber ? (
+                        <div className="flex gap-2">
+                          <span className="text-muted w-14">Block</span>
+                          <span className="font-mono text-white">
+                            {String(step.data.blockNumber)}
+                          </span>
+                        </div>
+                      ) : null}
+                      {step.data.logsCount ? (
+                        <div className="flex gap-2">
+                          <span className="text-muted w-14">Events</span>
+                          <span className="font-mono text-white">
+                            {String(step.data.logsCount)} emitted
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {/* Side effects data card */}
+                  {step?.data && p.id === "side-effects" && (
+                    <div className="mt-2 p-2.5 rounded bg-surface-2/50 border border-surface-3/50 text-[11px]">
+                      <span className="text-muted block mb-1">
+                        Events Emitted
+                      </span>
+                      <ul className="space-y-0.5">
+                        {(
+                          (step.data.events as string[]) || []
+                        ).map((e, i) => (
+                          <li
+                            key={i}
+                            className="text-zinc-400 font-mono flex gap-1.5"
+                          >
+                            <span className="text-success/60">●</span>
+                            {e}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Simulation result summary ──────────────────────────────── */}
+      {simResult && !simResult.error && (
+        <div className="bg-surface-1 border border-surface-3 rounded-lg overflow-hidden">
+          <div className="px-4 py-3 border-b border-surface-3">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
+              Workflow Result
+            </span>
+          </div>
+          <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-[11px]">
+            <div>
+              <span className="text-muted block mb-0.5">Subject</span>
+              <span className="font-mono text-white break-all text-xs">
+                {String(simResult.subject).slice(0, 10)}...
+                {String(simResult.subject).slice(-6)}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted block mb-0.5">Approved</span>
+              <span
+                className={cn(
+                  "font-mono font-bold",
+                  simResult.approved ? "text-success" : "text-danger"
+                )}
+              >
+                {simResult.approved ? "YES" : "NO"}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted block mb-0.5">Risk Score</span>
+              <span className="font-mono text-white">
+                {String(simResult.riskScore)}/1000
+              </span>
+            </div>
+            <div>
+              <span className="text-muted block mb-0.5">Report Hash</span>
+              <span className="font-mono text-zinc-400 break-all">
+                {String(simResult.reportHash || "").slice(0, 14)}...
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Error display ──────────────────────────────────────────── */}
+      {error && (
+        <div className="p-4 rounded-lg bg-danger/5 border border-danger/20 text-sm text-danger font-mono break-all">
+          {error}
+        </div>
+      )}
+
+      {/* ── Raw log feed ───────────────────────────────────────────── */}
+      {logs.length > 0 && (
+        <div className="bg-surface-1 border border-surface-3 rounded-lg overflow-hidden">
+          <div className="px-4 py-3 border-b border-surface-3 flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
+              Raw Logs
+            </span>
+            <span className="text-[10px] font-mono text-zinc-500">
+              {logs.length} lines
+            </span>
+          </div>
+          <div className="max-h-64 overflow-y-auto p-3 space-y-0.5 scrollbar-thin">
+            {logs.map((l, i) => (
+              <div key={i} className="text-[11px] font-mono leading-relaxed">
+                <span className="text-zinc-600 select-none mr-2">
+                  {String(i + 1).padStart(3, " ")}
+                </span>
+                <span
+                  className={cn(
+                    "text-zinc-400",
+                    l.raw.includes("[USER LOG]") && "text-accent/80",
+                    l.raw.includes("[SIMULATION]") && "text-zinc-500",
+                    l.raw.includes("Error") && "text-danger/80",
+                    l.raw.includes("Workflow Simulation Result") &&
+                      "text-success/80"
+                  )}
+                >
+                  {l.raw}
+                </span>
+              </div>
+            ))}
+            <div ref={logEndRef} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,20 +1,42 @@
 # Confidential RWA Due‑Diligence Vault
 
-ERC‑4626 vault gated by an onchain compliance registry, intended to be driven by a Chainlink CRE workflow that performs KYB/KYC checks + LLM risk analysis and then writes approvals onchain.
+> **Hackathon submission for Chainlink CRE (Compute Runtime Environment)**
 
-## What’s in this repo (so far)
+An ERC‑4626 vault gated by an onchain compliance registry, driven by a **Chainlink CRE workflow** that performs KYB/KYC checks (Sumsub via x402 micropayments) + LLM risk analysis (Google Gemini) and writes approvals on-chain — with automated ERC-8004 agent reputation and validation side effects.
+
+## 🏗 Architecture
+
+```
+Browser → DiligencePortal.submit() → CRE Workflow → KYB (Sumsub/x402) + Gemini AI
+         → RWAComplianceReceiver.onReport() → ComplianceRegistry + ERC-8004 Agents
+         → RWAVault deposits enabled (ERC-4626 compliance-gated)
+```
+
+## 📁 Chainlink CRE Files
+
+| File | Description |
+|------|-------------|
+| [`cre/chainlink-Convergence/my-workflow/main.ts`](cre/chainlink-Convergence/my-workflow/main.ts) | **CRE Workflow** — 866-line TypeScript workflow: reads on-chain request → calls KYB provider (x402) → calls Gemini AI → writes compliance report on-chain |
+| [`cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json`](cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json) | CRE workflow config for local Anvil fork simulation |
+| [`cre/chainlink-Convergence/project.yaml`](cre/chainlink-Convergence/project.yaml) | CRE project settings (RPC targets for anvil/staging/production) |
+| [`cre/chainlink-Convergence/secrets.yaml`](cre/chainlink-Convergence/secrets.yaml) | CRE secrets configuration |
+| [`cre/README.md`](cre/README.md) | CRE workflow setup and simulation instructions |
+| [`src/RWAComplianceReceiver.sol`](src/RWAComplianceReceiver.sol) | On-chain receiver for CRE `writeReport` — validates workflow identity, updates ComplianceRegistry, triggers ERC-8004 side effects |
+| [`src/ComplianceRegistry.sol`](src/ComplianceRegistry.sol) | Compliance state (approved/riskScore/attestation) — written by CRE workflow, read by vault |
+| [`src/RWAVault.sol`](src/RWAVault.sol) | ERC-4626 vault with compliance gate — deposits blocked unless `isApproved()` |
+| [`services/kyb-provider/src/server.mjs`](services/kyb-provider/src/server.mjs) | KYB microservice (Sumsub + x402 paywall) — called by CRE workflow |
+| [`app/src/app/api/workflow/run/route.ts`](app/src/app/api/workflow/run/route.ts) | Next.js SSE API route — spawns CRE CLI, streams steps to browser, writes on-chain |
+
+## What's in this repo
 - `src/ComplianceRegistry.sol`: stores per-address approvals + riskScore + attestationHash; updates allowed by `owner` or `workflowOperator`.
 - `src/RWAVault.sol`: ERC‑4626 vault that blocks `deposit/mint` unless **both** caller and receiver are approved in `ComplianceRegistry`.
 - `src/DemoUSD.sol`: demo underlying ERC‑20 (6 decimals) for local/testnet demos.
+- `src/DiligencePortal.sol`: stores diligence requests and emits events for CRE workflow triggers.
+- `src/RWAComplianceReceiver.sol`: receives CRE `writeReport` payloads, validates workflow identity, updates ComplianceRegistry, triggers EAS attestations and ERC-8004 side effects.
 - `src/erc8004/*`: ERC‑8004 Identity/Reputation/Validation registries (agent reputation primitives).
-- `script/Deploy.s.sol`: deploys protocol + ERC‑8004 registries, auto-registers reputation/validation agents, and wires receiver-side ERC‑8004 automation.
-- `script/Configure.s.sol`: manually sets approval on the registry (useful until CRE workflow is wired).
-- ERC‑8004 helper scripts:
-  - `script/AgentRegister.s.sol`
-  - `script/GiveFeedback.s.sol`
-  - `script/RequestValidation.s.sol`
-  - `script/RespondValidation.s.sol`
-  - `script/ReadERC8004State.s.sol`
+- `services/kyb-provider/`: Express.js KYB microservice backed by Sumsub sandbox with x402 paywall.
+- `app/`: Next.js 14 frontend with real-time CRE workflow execution via SSE streaming.
+- `cre/`: Chainlink CRE workflow (TypeScript) with HTTP trigger, on-chain read/write, KYB + Gemini AI.
 
 ## Build & test
 ```bash

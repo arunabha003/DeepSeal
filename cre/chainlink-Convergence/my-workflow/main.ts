@@ -781,6 +781,7 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 				)(runtime.config)
 				.result()
 	runtime.log(`KYB providerStatus=${kyb.providerStatus} providerScore=${kyb.providerScore}`)
+	runtime.log(`Starting Gemini AI risk assessment model=${runtime.config.geminiModel}`)
 
 	const prompt = [
 		'You are an RWA compliance risk model.',
@@ -817,6 +818,8 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 
 	const approved = Boolean(geminiRisk.approved && kyb.providerStatus === 'APPROVED')
 	const riskScore = Math.max(0, Math.min(1000, Math.floor(geminiRisk.riskScore)))
+	runtime.log(`Gemini AI result approved=${geminiRisk.approved} riskScore=${geminiRisk.riskScore} reasons=${geminiRisk.reasonsText}`)
+	runtime.log(`Final decision approved=${approved} riskScore=${riskScore} (KYB=${kyb.providerStatus}, Gemini=${geminiRisk.approved})`)
 
 	const normalizedRisk: RiskJson = {
 		approved,
