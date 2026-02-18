@@ -16,26 +16,12 @@ This flow runs the protocol on an Anvil Base Sepolia fork using **CRE local simu
 
 > **x402 Buyer must be Account #1** (`0x7099...`). It has forked USDC balance on Base Sepolia. Its EIP-7702 delegation code must be cleared before x402 payments work (see step 2.5).
 
-## Deployed Contract Addresses
-
-| Contract | Address |
-|----------|---------|
-| DemoUSD | `0xFF196F1e3a895404d073b8611252cF97388773A7` |
-| ComplianceRegistry | `0xC36E784E1dff616bDae4EAc7B310F0934FaF04a4` |
-| RWAComplianceReceiver | `0xB98E0Fb673e5a0C6e15F1D0a9f36E7dA954A0D5E` |
-| RWAVault | `0x78dA752e9dBD73a9b0C0F5ddD15e854D2B879524` |
-| DiligencePortal | `0x8071E429C7684fCe0250287F1578397142503241` |
-| IdentityRegistry | `0x1Cf34658E7Df9a46AD61486d007A8D62aeC9891e` |
-| ReputationRegistry | `0x33D10F2449Ffede92B43D4Fba562F132BA6A766A` |
-| ValidationRegistry | `0xB9818483D01ca0e721849703C58148CFb81328fC` |
-| USDC (forked) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
 ## ERC-8004 Agents
 
-| Agent ID | URI | Registered By |
-|----------|-----|---------------|
-| 1 | `ipfs://agents/rwa-diligence-reputation` | Agent Registrar |
-| 2 | `ipfs://agents/rwa-diligence-validator` | Agent Registrar |
+Agent IDs are minted by the IdentityRegistry at deploy time. Do not hardcode IDs.
+Use `broadcast/Deploy.s.sol/<chain-id>/run-latest.json` (or deploy logs) for the
+actual `ERC8004 ReputationAgentId` and `ERC8004 ValidationAgentId`.
 
 ---
 
@@ -76,6 +62,19 @@ SUMSUB_LEVEL_NAME=<your_sumsub_level_name>
 CRE_ETH_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80   # Account #0 (deployer)
 GEMINI_API_KEY=<your_gemini_api_key>
 X402_BUYER_PRIVATE_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d  # Account #1 (buyer - has forked USDC)
+
+# ERC-8004 deployment mode (defaults shown)
+USE_OFFICIAL_ERC8004=false
+REGISTER_ERC8004_AGENTS=true
+REPUTATION_AGENT_URI=
+VALIDATION_AGENT_URI=
+
+# Optional external registries (set when using official/shared registries)
+# ERC8004_IDENTITY_REGISTRY=0x...
+# ERC8004_REPUTATION_REGISTRY=0x...
+# ERC8004_VALIDATION_REGISTRY=0x...
+# ERC8004_REPUTATION_AGENT_ID=...
+# ERC8004_VALIDATION_AGENT_ID=...
 ```
 
 ## 2.5) Clear EIP-7702 delegation code from Anvil accounts
@@ -268,7 +267,7 @@ npm run dev    # starts on http://localhost:3000
 - Mint dUSD -> Approve Vault -> Deposit (compliance-gated) -> Withdraw
 
 #### 5. Agents (`/agents`)
-- Browse: 2 bootstrap agents. Agent 1=REP, Agent 2=VAL
+- Browse bootstrap agents (IDs come from deploy logs/config)
 - Register new agent, give feedback, request/respond validation
 
 ---

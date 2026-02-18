@@ -14,6 +14,11 @@ import {ReputationRegistry} from "../src/erc8004/ReputationRegistry.sol";
 import {ValidationRegistry} from "../src/erc8004/ValidationRegistry.sol";
 
 contract Deploy is Script {
+    address internal constant ERC8004_SEPOLIA_IDENTITY_REGISTRY = 0x8004A818BFB912233c491871b3d84c89A494BD9e;
+    address internal constant ERC8004_SEPOLIA_REPUTATION_REGISTRY = 0x8004B663056A597Dffe9eCcC1965A193B7388713;
+    address internal constant ERC8004_MAINNET_IDENTITY_REGISTRY = 0x8004A169FB4a3325136EB29fA0ceB6D2e539a432;
+    address internal constant ERC8004_MAINNET_REPUTATION_REGISTRY = 0x8004BAa17C55a88189AE136b182e5fdA19dE9b63;
+
     struct DeployConfig {
         uint256 deployerKey;
         address deployer;
@@ -28,6 +33,15 @@ contract Deploy is Script {
         bytes32 easSchemaUid;
         bool easRevocable;
         uint256 seedAmount;
+        bool useOfficialERC8004;
+        address identityRegistryAddress;
+        address reputationRegistryAddress;
+        address validationRegistryAddress;
+        bool registerERC8004Agents;
+        uint256 reputationAgentId;
+        uint256 validationAgentId;
+        address validationResponder;
+        bool validationAutoRespond;
         string reputationAgentUri;
         string validationAgentUri;
     }
@@ -70,8 +84,27 @@ contract Deploy is Script {
         cfg.easSchemaUid = vm.envOr("EAS_SCHEMA_UID", bytes32(0));
         cfg.easRevocable = vm.envOr("EAS_REVOCABLE", true);
         cfg.seedAmount = vm.envOr("SEED_AMOUNT", uint256(1_000_000e6));
-        cfg.reputationAgentUri = vm.envOr("REPUTATION_AGENT_URI", string("ipfs://agents/rwa-diligence-reputation"));
-        cfg.validationAgentUri = vm.envOr("VALIDATION_AGENT_URI", string("ipfs://agents/rwa-diligence-validator"));
+        cfg.useOfficialERC8004 = vm.envOr("USE_OFFICIAL_ERC8004", false);
+        cfg.identityRegistryAddress = vm.envOr("ERC8004_IDENTITY_REGISTRY", address(0));
+        cfg.reputationRegistryAddress = vm.envOr("ERC8004_REPUTATION_REGISTRY", address(0));
+        cfg.validationRegistryAddress = vm.envOr("ERC8004_VALIDATION_REGISTRY", address(0));
+        cfg.registerERC8004Agents = vm.envOr("REGISTER_ERC8004_AGENTS", true);
+        cfg.reputationAgentId = vm.envOr("ERC8004_REPUTATION_AGENT_ID", uint256(0));
+        cfg.validationAgentId = vm.envOr("ERC8004_VALIDATION_AGENT_ID", uint256(0));
+        cfg.validationResponder = vm.envOr("ERC8004_VALIDATION_RESPONDER", address(0));
+        cfg.validationAutoRespond = vm.envOr("ERC8004_VALIDATION_AUTO_RESPOND", true);
+        cfg.reputationAgentUri = vm.envOr("REPUTATION_AGENT_URI", string(""));
+        cfg.validationAgentUri = vm.envOr("VALIDATION_AGENT_URI", string(""));
+
+        if (cfg.useOfficialERC8004) {
+            if (block.chainid == 11155111) {
+                cfg.identityRegistryAddress = ERC8004_SEPOLIA_IDENTITY_REGISTRY;
+                cfg.reputationRegistryAddress = ERC8004_SEPOLIA_REPUTATION_REGISTRY;
+            } else if (block.chainid == 1) {
+                cfg.identityRegistryAddress = ERC8004_MAINNET_IDENTITY_REGISTRY;
+                cfg.reputationRegistryAddress = ERC8004_MAINNET_REPUTATION_REGISTRY;
+            }
+        }
     }
 
     function _deploy(DeployConfig memory cfg) internal returns (DeployArtifacts memory out) {
@@ -94,15 +127,46 @@ contract Deploy is Script {
         out.vault = new RWAVault(out.asset, out.registry, "RWA Vault Share", "RWAV");
         out.portal = new DiligencePortal();
 
-        out.identityRegistry = new IdentityRegistry();
-        out.reputationRegistry = new ReputationRegistry();
-        out.reputationRegistry.initialize(address(out.identityRegistry));
-        out.validationRegistry = new ValidationRegistry();
-        out.validationRegistry.initialize(address(out.identityRegistry));
+        if (cfg.identityRegistryAddress == address(0)) {
+            out.identityRegistry = new IdentityRegistry();
+        } else {
+            out.identityRegistry = IdentityRegistry(cfg.identityRegistryAddress);
+        }
 
-        _registerERC8004Agents(cfg, out);
-        out.receiver.setERC8004Reputation(address(out.reputationRegistry), out.reputationAgentId, 0);
-        out.receiver.setERC8004Validation(address(out.validationRegistry), out.validationAgentId, address(out.receiver), true);
+        if (cfg.reputationRegistryAddress == address(0)) {
+            out.reputationRegistry = new ReputationRegistry();
+            out.reputationRegistry.initialize(address(out.identityRegistry));
+        } else {
+            out.reputationRegistry = ReputationRegistry(cfg.reputationRegistryAddress);
+        }
+
+        if (cfg.validationRegistryAddress == address(0)) {
+            out.validationRegistry = new ValidationRegistry();
+            out.validationRegistry.initialize(address(out.identityRegistry));
+        } else {
+            out.validationRegistry = ValidationRegistry(cfg.validationRegistryAddress);
+        }
+
+        if (cfg.registerERC8004Agents) {
+            _registerERC8004Agents(cfg, out);
+        } else {
+            out.reputationAgentId = cfg.reputationAgentId;
+            out.validationAgentId = cfg.validationAgentId;
+        }
+
+        if (address(out.reputationRegistry) != address(0)) {
+            out.receiver.setERC8004Reputation(address(out.reputationRegistry), out.reputationAgentId, 0);
+        }
+
+        if (address(out.validationRegistry) != address(0)) {
+            address responder = cfg.validationResponder;
+            if (responder == address(0) && cfg.validationAutoRespond) {
+                responder = address(out.receiver);
+            }
+            out.receiver.setERC8004Validation(
+                address(out.validationRegistry), out.validationAgentId, responder, cfg.validationAutoRespond
+            );
+        }
 
         out.asset.mint(cfg.deployer, cfg.seedAmount);
     }
@@ -119,16 +183,24 @@ contract Deploy is Script {
 
         vm.stopBroadcast();
         vm.startBroadcast(cfg.agentRegistrarKey);
-        out.reputationAgentId = out.identityRegistry.register(cfg.reputationAgentUri);
-        out.validationAgentId = out.identityRegistry.register(cfg.validationAgentUri);
+        out.reputationAgentId = _registerAgent(out.identityRegistry, cfg.reputationAgentUri);
+        out.validationAgentId = _registerAgent(out.identityRegistry, cfg.validationAgentUri);
         out.identityRegistry.approve(address(out.receiver), out.validationAgentId);
         vm.stopBroadcast();
         vm.startBroadcast(cfg.deployerKey);
     }
 
+    function _registerAgent(IdentityRegistry identityRegistry, string memory agentUri) internal returns (uint256 agentId) {
+        if (bytes(agentUri).length == 0) {
+            return identityRegistry.register();
+        }
+        return identityRegistry.register(agentUri);
+    }
+
     function _print(DeployConfig memory cfg, DeployArtifacts memory out) internal {
         console2.log("Deployer:", cfg.deployer);
         console2.log("ERC8004 AgentRegistrar:", cfg.agentRegistrar);
+        console2.log("USE_OFFICIAL_ERC8004:", cfg.useOfficialERC8004);
         console2.log("CREReportForwarder:", cfg.reportForwarder);
         console2.logBytes32(cfg.expectedWorkflowId);
         console2.log("ExpectedAuthor:", cfg.expectedAuthor);

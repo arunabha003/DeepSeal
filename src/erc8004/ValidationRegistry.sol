@@ -164,5 +164,8 @@ contract ValidationRegistry {
     function _isOwnerOrOperator(address owner, uint256 agentId, address caller) internal view returns (bool) {
         return (caller == owner || _identityRegistry.getApproved(agentId) == caller || _identityRegistry.isApprovedForAll(owner, caller));
     }
-}
 
+    function getVersion() external pure returns (string memory) {
+        return "2.0.0";
+    }
+}

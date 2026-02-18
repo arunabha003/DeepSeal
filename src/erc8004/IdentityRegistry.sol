@@ -135,6 +135,10 @@ contract IdentityRegistry is ERC721URIStorage, EIP712 {
         return (caller == owner_ || isApprovedForAll(owner_, caller) || getApproved(agentId) == caller);
     }
 
+    function isAuthorizedOrOwner(address spender, uint256 agentId) external view returns (bool) {
+        return _isApprovedOrOwner(spender, agentId);
+    }
+
     function _isValidWalletSignature(address wallet, bytes32 digest, bytes calldata signature) internal view returns (bool) {
         if (wallet.code.length == 0) {
             address recovered = ECDSA.recover(digest, signature);
@@ -169,5 +173,8 @@ contract IdentityRegistry is ERC721URIStorage, EIP712 {
     function supportsInterface(bytes4 interfaceId) public view override(ERC721URIStorage) returns (bool) {
         return ERC721URIStorage.supportsInterface(interfaceId);
     }
-}
 
+    function getVersion() external pure returns (string memory) {
+        return "2.0.0";
+    }
+}

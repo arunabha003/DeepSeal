@@ -200,7 +200,7 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
         IReputationRegistry rep = reputationRegistry;
         uint256 repAgent = reputationAgentId;
         uint8 decimals = reputationValueDecimals;
-        if (address(rep) != address(0) && repAgent != 0) {
+        if (address(rep) != address(0)) {
             int128 value = _toReputationValue(approved, riskScore);
             bytes32 feedbackHash = keccak256(abi.encode(subject, approved, riskScore, attestationHash, block.timestamp));
             try rep.giveFeedback(
@@ -215,7 +215,7 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
         IValidationRegistry val = validationRegistry;
         uint256 valAgent = validationAgentId;
         address responder = validationResponder;
-        if (address(val) != address(0) && valAgent != 0 && responder != address(0)) {
+        if (address(val) != address(0) && responder != address(0)) {
             bytes32 requestHash = keccak256(abi.encode(subject, attestationHash, valAgent, block.timestamp, address(this)));
             try val.validationRequest(responder, valAgent, "", requestHash) {
                 emit ERC8004ValidationRequested(valAgent, requestHash, responder);

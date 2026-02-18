@@ -299,6 +299,10 @@ contract ReputationRegistry {
         return _lastIndex[agentId][clientAddress];
     }
 
+    function getVersion() external pure returns (string memory) {
+        return "2.0.0";
+    }
+
     function _ownerOf(uint256 agentId) internal view returns (address owner) {
         try _identityRegistry.ownerOf(agentId) returns (address o) {
             owner = o;

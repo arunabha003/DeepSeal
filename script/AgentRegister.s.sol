@@ -15,7 +15,11 @@ contract AgentRegister is Script {
         string memory agentUri = vm.envOr("AGENT_URI", string(""));
 
         vm.startBroadcast(deployerKey);
-        agentId = IdentityRegistry(identityRegistryAddr).register(agentUri);
+        if (bytes(agentUri).length == 0) {
+            agentId = IdentityRegistry(identityRegistryAddr).register();
+        } else {
+            agentId = IdentityRegistry(identityRegistryAddr).register(agentUri);
+        }
         vm.stopBroadcast();
 
         console2.log("Registrar:", deployer);
@@ -24,4 +28,3 @@ contract AgentRegister is Script {
         console2.log("AgentURI:", agentUri);
     }
 }
-
