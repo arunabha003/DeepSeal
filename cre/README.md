@@ -4,9 +4,11 @@ This folder contains the fully-implemented Chainlink CRE workflow that orchestra
 end-to-end compliance pipeline:
 
 1. **Reads** a diligence request from `DiligencePortal` on-chain (Base Sepolia)
-2. **Calls KYB provider** (Sumsub sandbox) via x402 micropayment rail
-3. **Calls Gemini AI** for structured risk scoring with model fallback
-4. **Writes** the decision on-chain to `RWAComplianceReceiver.onReport()` → updates `ComplianceRegistry` + triggers ERC-8004 agent side effects
+2. **Resolves and verifies** the document bundle from `metadataUri` via secure resolver (`/docs/resolve`)
+3. **Extracts deterministic fields** (`companyInfo`) and records extraction provenance hashes
+4. **Calls KYB provider** (Sumsub sandbox) via x402 micropayment rail
+5. **Calls Gemini AI** for structured risk scoring with model fallback
+6. **Writes** the decision on-chain to `RWAComplianceReceiver.onReport()` → updates `ComplianceRegistry` + triggers ERC-8004 agent side effects
 
 ## Key Files
 
@@ -34,7 +36,7 @@ forge script script/SubmitRequest.s.sol:SubmitRequest --rpc-url http://127.0.0.1
 
 # 4. Run CRE simulation
 cd cre/chainlink-Convergence
-PAYLOAD='{"requestId":1,"companyInfo":{"companyName":"Acme LLC","country":"USA","registrationNumber":"1234567"}}'
+PAYLOAD='{"requestId":1}'
 cre workflow simulate ./my-workflow \
   --target anvil-e2e-settings \
   --trigger-index 0 \
@@ -54,6 +56,7 @@ Required secrets (set in `cre/chainlink-Convergence/.env` or CRE secrets manager
 
 Optional (for x402 paid KYB path):
 - `X402_BUYER_PRIVATE_KEY` — Wallet key to pay KYB provider via x402
+- `DOC_RESOLVER_API_KEY` — Shared key for `/docs/resolve` (if enabled on resolver service)
 
 ## Contracts the Workflow Writes To
 
@@ -63,5 +66,6 @@ Optional (for x402 paid KYB path):
 
 ## Trigger Options
 
-- **HTTP trigger** (default): POST `{ requestId, companyInfo }` — used by the frontend
+- **HTTP trigger** (default): POST `{ requestId }` — document fields are resolved from onchain `metadataUri`
+- **Fallback mode (non-production)**: POST `{ requestId, companyInfo }` only if `allowPayloadCompanyInfoFallback=true`
 - **EVM log trigger**: Listen to `DiligencePortal.DiligenceRequested(...)` for production use

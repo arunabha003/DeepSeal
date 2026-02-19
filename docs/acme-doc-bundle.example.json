@@ -1,0 +1,23 @@
+{
+  "companyInfo": {
+    "companyName": "Acme LLC",
+    "country": "USA",
+    "registrationNumber": "1234567",
+    "website": "https://acme.example"
+  },
+  "documents": [
+    {
+      "type": "certificate_of_incorporation",
+      "uri": "ipfs://<CID>/coi.pdf",
+      "sha256": "<sha256_of_original_file>"
+    },
+    {
+      "type": "beneficial_owners",
+      "uri": "ipfs://<CID>/ubo.csv",
+      "sha256": "<sha256_of_original_file>"
+    }
+  ],
+  "attestations": {
+    "issuerSignature": "<optional-signature-by-issuer>"
+  }
+}

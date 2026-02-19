@@ -2,9 +2,11 @@
 
 This workflow processes an onchain diligence request stored in `DiligencePortal` by:
 1) reading the request data onchain (`getRequest(requestId)`)
-2) calling a KYB verification endpoint (Sumsub sandbox via local provider)
-3) calling Gemini for a strict JSON risk decision
-4) writing the decision onchain via `EVMClient.writeReport` to `RWAComplianceReceiver`
+2) resolving + verifying the metadata document bundle (`metadataUri` + `docBundleHash`) via `/docs/resolve`
+3) deterministically extracting normalized `companyInfo` from the document bundle
+4) calling a KYB verification endpoint (Sumsub sandbox via local provider)
+5) calling Gemini for a strict JSON risk decision
+6) writing the decision onchain via `EVMClient.writeReport` to `RWAComplianceReceiver`
 
 `RWAComplianceReceiver` then updates `ComplianceRegistry` and (if configured onchain) performs EAS + ERC-8004 side effects.
 
@@ -26,10 +28,14 @@ Then edit the selected file:
 - `diligencePortalAddress` (deployed `DiligencePortal`)
 - `receiverAddress` (deployed `RWAComplianceReceiver`)
 - `kybUrl` (local provider route)
+- `documentResolverUrl` (local resolver route, usually `http://127.0.0.1:3001/docs/resolve`)
  - Optional:
    - `useConfidentialHttp` (explicit Confidential HTTP client)
    - `x402Enabled` (should match whether KYB is paywalled on `POST /kyb`)
+   - `requireDocumentResolution` (default/production: `true`)
+   - `allowPayloadCompanyInfoFallback` (production: `false`; local-only recovery switch)
    - `geminiApiKey` / `x402BuyerPrivateKey` (local simulation fallback when CRE secrets are not linked)
+   - `docResolverApiKey` (optional shared key for resolver endpoint)
 
 ## x402 + Confidential HTTP
 - x402 buyer retries are implemented for both HTTP client paths.
@@ -62,7 +68,20 @@ PAYLOAD=$(jq -c . ../http-payload.json)
 cre workflow simulate ./my-workflow --target anvil-e2e-settings --trigger-index 0 --http-payload "$PAYLOAD"
 ```
 
-Example `../http-payload.json`:
+Example `../http-payload.json` (production path):
 ```json
 { "requestId": 1 }
+```
+
+Fallback payload (only when `allowPayloadCompanyInfoFallback=true`):
+```json
+{
+  "requestId": 1,
+  "companyInfo": {
+    "companyName": "Acme LLC",
+    "country": "USA",
+    "registrationNumber": "1234567",
+    "website": "https://acme.example"
+  }
+}
 ```

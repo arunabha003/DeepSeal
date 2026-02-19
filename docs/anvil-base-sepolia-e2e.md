@@ -55,6 +55,11 @@ SUMSUB_BASE_URL=https://api.sumsub.com
 SUMSUB_APP_TOKEN=<your_sumsub_app_token>
 SUMSUB_SECRET_KEY=<your_sumsub_secret_key>
 SUMSUB_LEVEL_NAME=<your_sumsub_level_name>
+
+# Document resolver settings (secure metadataUri ingestion)
+DOC_RESOLVER_API_KEY=<optional_shared_key>
+DOC_RESOLVER_IPFS_GATEWAY=https://ipfs.io/ipfs
+DOC_RESOLVER_ALLOW_INSECURE_HTTP=true
 ```
 
 ### `cre/chainlink-Convergence/.env`
@@ -62,6 +67,7 @@ SUMSUB_LEVEL_NAME=<your_sumsub_level_name>
 CRE_ETH_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80   # Account #0 (deployer)
 GEMINI_API_KEY=<your_gemini_api_key>
 X402_BUYER_PRIVATE_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d  # Account #1 (buyer - has forked USDC)
+DOC_RESOLVER_API_KEY=<same_optional_shared_key_if_used>
 
 # ERC-8004 deployment mode (defaults shown)
 USE_OFFICIAL_ERC8004=false
@@ -141,10 +147,15 @@ cd app && node scripts/sync-abis.mjs
 ## 6) Submit diligence request
 ```bash
 
+# Build or fetch your real document bundle first, then compute its hash:
+node tools/hash-doc-bundle.mjs --file ./docs/acme-doc-bundle.example.json
+# OR for already uploaded IPFS content:
+# node tools/hash-doc-bundle.mjs --uri ipfs://<CID>/<path>
+
 export PORTAL_ADDRESS=$(jq -r '[.transactions[] | select(.contractName=="DiligencePortal")][0].contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
 export SUBJECT=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-export DOC_BUNDLE_HASH=0x1111111111111111111111111111111111111111111111111111111111111111
-export METADATA_URI=ipfs://rwa-docs/acme
+export DOC_BUNDLE_HASH=<hash_from_tool_output>
+export METADATA_URI=ipfs://<CID>/<path-to-doc-bundle.json>
 
 forge script script/SubmitRequest.s.sol:SubmitRequest --rpc-url "$RPC_URL" --broadcast
 ```
@@ -168,13 +179,7 @@ cd cre/chainlink-Convergence
 
 cat > ../../http-payload.local.json <<'EOF'
 {
-  "requestId": 1,
-  "companyInfo": {
-    "companyName": "Acme LLC",
-    "country": "USA",
-    "registrationNumber": "1234567",
-    "website": "https://acme.example"
-  }
+  "requestId": 1
 }
 EOF
 
@@ -199,6 +204,7 @@ cre workflow simulate ./my-workflow \
 
 Expected in local simulate:
 - `Workflow Simulation Result` includes `txHash: "simulation-no-txhash"` (this is normal in local simulation mode).
+- `Workflow Simulation Result` includes `extractionHash` and `documentSourceHash` proving document-derived processing.
 
 ## 10) Verify on-chain outcome
 ```bash

@@ -89,6 +89,9 @@ X402_PAY_TO=<X402_RECIPIENT_ADDRESS>
   "receiverAddress": "0x7cbFd330F61723c215c5061eD3b1A75CCCbF4e42",
   "gasLimit": "1000000",
   "kybUrl": "http://127.0.0.1:3001/kyb",
+  "documentResolverUrl": "http://127.0.0.1:3001/docs/resolve",
+  "requireDocumentResolution": true,
+  "allowPayloadCompanyInfoFallback": false,
   "geminiModel": "gemini-2.5-flash",
   "geminiApiKey": "<your_gemini_api_key>",
   "x402BuyerPrivateKey": "",
@@ -151,8 +154,9 @@ export RPC_URL=https://sepolia.base.org
 export PRIVATE_KEY=<DEPLOYER_PRIVATE_KEY>
 export PORTAL_ADDRESS=0x337c75270D09A8D8BFCe386F93715E230b39E48c
 export SUBJECT=0x28ea4eF61ac4cca3ed6a64dBb5b2D4be1aDC9814
-export DOC_BUNDLE_HASH=0x1111111111111111111111111111111111111111111111111111111111111111
-export METADATA_URI=ipfs://rwa-docs/acme
+node tools/hash-doc-bundle.mjs --uri ipfs://<CID>/<path-to-doc-bundle.json>
+export DOC_BUNDLE_HASH=<hash_from_tool_output>
+export METADATA_URI=ipfs://<CID>/<path-to-doc-bundle.json>
 
 forge script script/SubmitRequest.s.sol:SubmitRequest \
   --rpc-url "$RPC_URL" \
@@ -166,15 +170,7 @@ cd cre/chainlink-Convergence
 
 # Build the HTTP payload
 cat > ../../http-payload.local.json <<'EOF'
-{
-  "requestId": 1,
-  "companyInfo": {
-    "companyName": "Acme LLC",
-    "country": "USA",
-    "registrationNumber": "1234567",
-    "website": "https://acme.example"
-  }
-}
+{ "requestId": 1 }
 EOF
 
 PAYLOAD=$(jq -c . ../../http-payload.local.json)
@@ -188,6 +184,7 @@ cre workflow simulate ./my-workflow \
 ```
 
 Expected output includes:
+- document resolver verification (`sourceHash`) + deterministic extraction (`extractionHash`)
 - KYB check via x402 paywall → APPROVED (if `FORCE_APPROVE=true`)
 - Gemini LLM risk analysis → risk score
 - On-chain write to ComplianceRegistry via RWAComplianceReceiver
