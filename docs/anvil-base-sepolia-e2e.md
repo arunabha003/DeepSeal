@@ -101,20 +101,17 @@ for addr in \
     --data '{"jsonrpc":"2.0","method":"anvil_setCode","params":["'"$addr"'","0x"],"id":1}' \
     http://127.0.0.1:8545 > /dev/null
 done
-echo "Cleared all delegation code"
 ```
 
 Verify:
 ```bash
-cast code 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --rpc-url http://127.0.0.1:8545  # => 0x
-cast code 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 --rpc-url http://127.0.0.1:8545  # => 0x
+cast code 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --rpc-url http://127.0.0.1:8545  
+cast code 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 --rpc-url http://127.0.0.1:8545  
 ```
 
-> **Note:** Account #7 (`0x14dC...`) is the only account already clean on Base Sepolia fork.
 
 ## 3) Deploy contracts to Anvil fork
 ```bash
-cd /Users/arunabha003/Documents/Projects/Chainlink-Converegence
 
 export RPC_URL=http://127.0.0.1:8545
 export PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
@@ -135,7 +132,6 @@ cd app && node scripts/sync-abis.mjs
 
 ## 6) Submit diligence request
 ```bash
-cd /Users/arunabha003/Documents/Projects/Chainlink-Converegence
 
 export PORTAL_ADDRESS=$(jq -r '[.transactions[] | select(.contractName=="DiligencePortal")][0].contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
 export SUBJECT=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
@@ -145,7 +141,6 @@ export METADATA_URI=ipfs://rwa-docs/acme
 forge script script/SubmitRequest.s.sol:SubmitRequest --rpc-url "$RPC_URL" --broadcast
 ```
 
-Creates **requestId=1**.
 
 ## 7) Start KYB provider
 ```bash
@@ -153,15 +148,11 @@ cd services/kyb-provider
 npm install && npm run dev
 ```
 
-Verify: `curl -sf http://127.0.0.1:3001/healthz` -> `{"ok":true,"x402Enabled":true}`
-
 ## 8) Preflight checks
 ```bash
 cd /Users/arunabha003/Documents/Projects/Chainlink-Converegence
 CRE_CONFIG_PATH=cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json RPC_URL=http://127.0.0.1:8545 node tools/readiness-check.mjs
 ```
-
-Should print: `Readiness check passed`.
 
 ## 9) Run CRE workflow simulation
 ```bash
