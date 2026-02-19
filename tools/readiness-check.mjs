@@ -57,8 +57,8 @@ function checkConfig() {
     missing.push("receiverAddress (non-zero)");
   }
   if (!cfg.kybUrl) missing.push("kybUrl");
-  if (cfg.requireDocumentResolution !== false && !cfg.documentResolverUrl) {
-    missing.push("documentResolverUrl (required when requireDocumentResolution=true)");
+  if (!cfg.documentResolverUrl) {
+    missing.push("documentResolverUrl");
   }
   if (!cfg.geminiModel) missing.push("geminiModel");
 

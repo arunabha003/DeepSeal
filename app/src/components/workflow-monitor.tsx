@@ -25,12 +25,6 @@ interface LogEntry {
 
 interface WorkflowMonitorProps {
   requestId: number;
-  companyInfo?: {
-    companyName: string;
-    country: string;
-    registrationNumber?: string;
-    website?: string;
-  };
   onComplete?: (result: Record<string, unknown>) => void;
 }
 
@@ -52,7 +46,6 @@ const PIPELINE: { id: string; label: string }[] = [
 /* ── Component ───────────────────────────────────────────────────────── */
 export function WorkflowMonitor({
   requestId,
-  companyInfo,
   onComplete,
 }: WorkflowMonitorProps) {
   const [steps, setSteps] = useState<Map<string, StepData>>(new Map());
@@ -83,7 +76,7 @@ export function WorkflowMonitor({
       const res = await fetch("/api/workflow/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId, companyInfo }),
+        body: JSON.stringify({ requestId }),
         signal: abort.signal,
       });
 
@@ -155,7 +148,7 @@ export function WorkflowMonitor({
     } finally {
       setIsRunning(false);
     }
-  }, [requestId, companyInfo, onComplete, scrollToBottom, simResult]);
+  }, [requestId, onComplete, scrollToBottom, simResult]);
 
   const cancel = useCallback(() => {
     abortRef.current?.abort();

@@ -74,7 +74,7 @@ function sseEvent(event: string, data: unknown): string {
 // ── POST handler ────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { requestId, companyInfo } = body;
+  const { requestId } = body;
 
   if (!requestId) {
     return new Response(JSON.stringify({ error: "requestId is required" }), {
@@ -103,12 +103,9 @@ export async function POST(req: NextRequest) {
           detail: `Request #${requestId}`,
         });
 
-        const payload: Record<string, unknown> = {
+        const payload = {
           requestId: Number(requestId),
         };
-        if (companyInfo && typeof companyInfo === "object") {
-          payload.companyInfo = companyInfo;
-        }
         fs.writeFileSync(PAYLOAD_PATH, JSON.stringify(payload, null, 2));
 
         send("step", {
@@ -282,15 +279,6 @@ export async function POST(req: NextRequest) {
                   detail: "Calling KYB provider with x402 payment...",
                 });
               }
-            }
-
-            if (trimmed.includes("Document resolution failed; using payload fallback")) {
-              send("step", {
-                id: "doc-resolve",
-                status: "error",
-                label: "Resolving + Verifying Document Bundle",
-                detail: "Resolver failed; payload fallback was used (non-production mode).",
-              });
             }
 
             if (trimmed.includes("Extracted companyInfo")) {

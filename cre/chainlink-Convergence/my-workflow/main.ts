@@ -43,8 +43,6 @@ const configSchema = z.object({
 	gasLimit: z.string(),
 	kybUrl: z.string(),
 	documentResolverUrl: z.string().optional(),
-	requireDocumentResolution: z.boolean().optional(),
-	allowPayloadCompanyInfoFallback: z.boolean().optional(),
 	geminiModel: z.string(),
 	geminiApiKey: z.string().optional(),
 	x402BuyerPrivateKey: z.string().optional(),
@@ -57,16 +55,7 @@ type Config = z.infer<typeof configSchema>
 
 const requestSchema = z.object({
 	requestId: z.union([z.number().int().positive(), z.string().regex(/^[0-9]+$/)]),
-	companyInfo: z
-		.object({
-			companyName: z.string().min(1),
-			country: z.string().min(2),
-			registrationNumber: z.string().optional(),
-			incorporatedOn: z.string().optional(),
-			website: z.string().optional(),
-		})
-		.optional(),
-})
+}).strict()
 
 type DiligenceRequest = {
 	requester: Address
@@ -258,16 +247,6 @@ const getDocumentResolverUrl = (config: Config): string => {
 	const explicit = String(config.documentResolverUrl || '').trim()
 	if (explicit) return explicit
 	return config.kybUrl.replace(/\/kyb(?:\/free)?$/i, '/docs/resolve')
-}
-
-const computePayloadExtractionHash = (companyInfo: CompanyInfo): `0x${string}` => {
-	const canonical = JSON.stringify({
-		companyName: companyInfo.companyName,
-		country: companyInfo.country,
-		registrationNumber: companyInfo.registrationNumber || '',
-		website: companyInfo.website || '',
-	})
-	return keccak256(toHex(canonical))
 }
 
 const resolveDocumentHttp = (
@@ -932,14 +911,6 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 	const inputJson = Buffer.from(payload.input).toString('utf-8')
 	const parsed = requestSchema.parse(parseTriggerInput(inputJson))
 	const requestId = BigInt(typeof parsed.requestId === 'string' ? parsed.requestId : parsed.requestId)
-	const payloadCompanyInfo: CompanyInfo | undefined = parsed.companyInfo
-		? {
-				companyName: parsed.companyInfo.companyName,
-				country: parsed.companyInfo.country,
-				...(parsed.companyInfo.registrationNumber ? { registrationNumber: parsed.companyInfo.registrationNumber } : {}),
-				...(parsed.companyInfo.website ? { website: parsed.companyInfo.website } : {}),
-			}
-		: undefined
 
 	runtime.log(`Processing diligence requestId=${requestId.toString()}`)
 
@@ -948,84 +919,48 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 	const x402BuyerPk = Boolean(runtime.config.x402Enabled) ? getRequiredSecret(runtime, 'X402_BUYER_PRIVATE_KEY') : ''
 	const docResolverApiKey = getOptionalSecret(runtime, 'DOC_RESOLVER_API_KEY')
 	const useConf = Boolean(runtime.config.useConfidentialHttp)
-	const requireDocumentResolution = runtime.config.requireDocumentResolution !== false
-	const allowPayloadFallback = runtime.config.allowPayloadCompanyInfoFallback === true
-	const canFallbackToPayload = Boolean(payloadCompanyInfo) && (allowPayloadFallback || !requireDocumentResolution)
 
-	let documentResolution: DocumentResolution | null = null
+	let documentResolution: DocumentResolution
 	let companyInfo: CompanyInfo
 	let extractionHash: `0x${string}`
 	let documentSourceHash: `0x${string}`
 	let resolvedDocumentUrl: string
 
-	if (requireDocumentResolution || !payloadCompanyInfo) {
-		try {
-			runtime.log(
-				`Resolving document bundle via ${getDocumentResolverUrl(runtime.config)} requireDocumentResolution=${requireDocumentResolution}`,
-			)
-			documentResolution = useConf
-				? new ConfidentialHTTPClient()
-						.sendRequest(
-							runtime,
-							(sr: ConfidentialHTTPSendRequester, cfg: Config) =>
-								resolveDocumentConfidential(sr, cfg, req, docResolverApiKey),
-							ConsensusAggregationByFields<DocumentResolution>({
-								metadataUri: identical,
-								resolvedUrl: identical,
-								sourceHash: identical,
-								extractionHash: identical,
-								companyInfo: identical,
-							}),
-						)(runtime.config)
-						.result()
-				: new HTTPClient()
-						.sendRequest(
-							runtime,
-							(sr: HTTPSendRequester, cfg: Config) => resolveDocumentHttp(sr, cfg, req, docResolverApiKey),
-							ConsensusAggregationByFields<DocumentResolution>({
-								metadataUri: identical,
-								resolvedUrl: identical,
-								sourceHash: identical,
-								extractionHash: identical,
-								companyInfo: identical,
-							}),
-						)(runtime.config)
-						.result()
+	runtime.log(`Resolving document bundle via ${getDocumentResolverUrl(runtime.config)}`)
+	documentResolution = useConf
+		? new ConfidentialHTTPClient()
+				.sendRequest(
+					runtime,
+					(sr: ConfidentialHTTPSendRequester, cfg: Config) =>
+						resolveDocumentConfidential(sr, cfg, req, docResolverApiKey),
+					ConsensusAggregationByFields<DocumentResolution>({
+						metadataUri: identical,
+						resolvedUrl: identical,
+						sourceHash: identical,
+						extractionHash: identical,
+						companyInfo: identical,
+					}),
+				)(runtime.config)
+				.result()
+		: new HTTPClient()
+				.sendRequest(
+					runtime,
+					(sr: HTTPSendRequester, cfg: Config) => resolveDocumentHttp(sr, cfg, req, docResolverApiKey),
+					ConsensusAggregationByFields<DocumentResolution>({
+						metadataUri: identical,
+						resolvedUrl: identical,
+						sourceHash: identical,
+						extractionHash: identical,
+						companyInfo: identical,
+					}),
+				)(runtime.config)
+				.result()
 
-			companyInfo = documentResolution.companyInfo
-			extractionHash = documentResolution.extractionHash
-			documentSourceHash = documentResolution.sourceHash
-			resolvedDocumentUrl = documentResolution.resolvedUrl
-			runtime.log(
-				`Document resolved sourceHash=${documentSourceHash} extractionHash=${extractionHash} resolvedUrl=${resolvedDocumentUrl}`,
-			)
-		} catch (err: any) {
-			if (!canFallbackToPayload) {
-				throw new Error(
-					`Document resolution failed and fallback is disabled. Cause: ${String(err?.message || err || 'unknown')}`,
-				)
-			}
-			companyInfo = payloadCompanyInfo as CompanyInfo
-			extractionHash = computePayloadExtractionHash(companyInfo)
-			documentSourceHash = extractionHash
-			resolvedDocumentUrl = 'payload-inline-fallback'
-			runtime.log(
-				`Document resolution failed; using payload fallback extractionHash=${extractionHash}. Cause=${String(
-					err?.message || err || 'unknown',
-				)}`,
-			)
-		}
-	} else {
-		companyInfo = payloadCompanyInfo
-		extractionHash = computePayloadExtractionHash(companyInfo)
-		documentSourceHash = extractionHash
-		resolvedDocumentUrl = 'payload-inline'
-		runtime.log(`Using payload companyInfo extractionHash=${extractionHash} (document resolution disabled).`)
-	}
-
-	if (documentResolution && payloadCompanyInfo) {
-		runtime.log('Ignoring payload companyInfo because resolved document extraction is available.')
-	}
+	companyInfo = documentResolution.companyInfo
+	extractionHash = documentResolution.extractionHash
+	documentSourceHash = documentResolution.sourceHash
+	resolvedDocumentUrl = documentResolution.resolvedUrl
+	runtime.log(`Document resolved sourceHash=${documentSourceHash} extractionHash=${extractionHash} resolvedUrl=${resolvedDocumentUrl}`)
 	runtime.log(`Extracted companyInfo=${JSON.stringify(companyInfo)}`)
 
 	const kyb = useConf
