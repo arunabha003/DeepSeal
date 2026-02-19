@@ -81,6 +81,12 @@ export async function POST(req: NextRequest) {
       status: 400,
     });
   }
+  if ("companyInfo" in body) {
+    return new Response(
+      JSON.stringify({ error: "companyInfo is no longer accepted. Submit only requestId; company data is resolved from metadataUri." }),
+      { status: 400 },
+    );
+  }
 
   const encoder = new TextEncoder();
 
