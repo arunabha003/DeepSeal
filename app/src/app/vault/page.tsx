@@ -15,8 +15,8 @@ import {
   DemoUSDABI,
   ComplianceRegistryABI,
 } from "@/lib/abis";
-import { Card, CardTitle, Stat, Badge, Button } from "@/components/ui";
-import { formatUnits, truncAddr } from "@/lib/utils";
+import { Card, CardTitle, Stat, Badge, Button, TxLink, AddressLink } from "@/components/ui";
+import { formatUnits, truncAddr, txUrl } from "@/lib/utils";
 
 /* helper: safely parse a token amount — returns null on bad input */
 function safeParse(value: string, decimals: number): bigint | null {
@@ -127,7 +127,7 @@ export default function VaultPage() {
         <Card className="!p-4">
           <Stat
             label="Underlying"
-            value={truncAddr(assetAddr)}
+            value={<AddressLink address={assetAddr} chars={5} />}
           />
         </Card>
       </div>
@@ -222,8 +222,8 @@ function MintDUSD() {
           {confirming ? "Confirming…" : isPending ? "Signing…" : "Mint"}
         </Button>
       </div>
-      {isSuccess && (
-        <p className="text-xs text-success mt-2">✓ Minted {amt} dUSD</p>
+      {isSuccess && hash && (
+        <p className="text-xs text-success mt-2">✓ Minted {amt} dUSD — <a href={txUrl(hash)} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">View TX ↗</a></p>
       )}
       {error && (
         <p className="text-xs text-danger mt-2 break-all">
@@ -276,8 +276,8 @@ function ApproveCard({ allowance }: { allowance: bigint }) {
           {confirming ? "Confirming…" : isPending ? "Signing…" : "Approve"}
         </Button>
       </div>
-      {isSuccess && (
-        <p className="text-xs text-success mt-2">✓ Approved {amt} dUSD for vault</p>
+      {isSuccess && hash && (
+        <p className="text-xs text-success mt-2">✓ Approved {amt} dUSD for vault — <a href={txUrl(hash)} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">View TX ↗</a></p>
       )}
       {error && (
         <p className="text-xs text-danger mt-2 break-all">
@@ -360,8 +360,8 @@ function DepositCard({
       {exceedsBalance && (
         <p className="text-xs text-warning mt-2">⚠ Exceeds your dUSD balance</p>
       )}
-      {isSuccess && (
-        <p className="text-xs text-success mt-2">✓ Deposited {amt} dUSD into vault</p>
+      {isSuccess && hash && (
+        <p className="text-xs text-success mt-2">✓ Deposited {amt} dUSD into vault — <a href={txUrl(hash)} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">View TX ↗</a></p>
       )}
       {error && (
         <p className="text-xs text-danger mt-2 break-all">
@@ -438,8 +438,8 @@ function WithdrawCard({
               {confirming ? "Confirming…" : isPending ? "Signing…" : "Withdraw"}
             </Button>
           </div>
-          {isSuccess && (
-            <p className="text-xs text-success mt-2">✓ Withdrawn {amt} dUSD from vault</p>
+          {isSuccess && hash && (
+            <p className="text-xs text-success mt-2">✓ Withdrawn {amt} dUSD from vault — <a href={txUrl(hash)} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">View TX ↗</a></p>
           )}
           {error && (
             <p className="text-xs text-danger mt-2 break-all">

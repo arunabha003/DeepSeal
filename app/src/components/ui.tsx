@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { txUrl, addressUrl, truncAddr } from "@/lib/utils";
 import { type HTMLAttributes, type ReactNode } from "react";
 
 export function Card({
@@ -132,5 +133,38 @@ export function StatusDot({ active }: { active: boolean }) {
         active ? "bg-success" : "bg-surface-4"
       )}
     />
+  );
+}
+
+/* ── Explorer links ─────────────────────────────────── */
+export function TxLink({ hash, className }: { hash: string; className?: string }) {
+  if (!hash || hash === "simulation-no-txhash") return <span className={cn("font-mono text-muted text-xs", className)}>{hash || "--"}</span>;
+  return (
+    <a
+      href={txUrl(hash)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn("font-mono text-accent hover:underline text-xs inline-flex items-center gap-1", className)}
+    >
+      {truncAddr(hash, 8)}
+      <span className="text-[10px]">↗</span>
+    </a>
+  );
+}
+
+export function AddressLink({ address, chars, className }: { address: string; chars?: number; className?: string }) {
+  if (!address || address === "0x0000000000000000000000000000000000000000") {
+    return <span className={cn("font-mono text-muted text-xs", className)}>{address ? truncAddr(address, chars) : "--"}</span>;
+  }
+  return (
+    <a
+      href={addressUrl(address)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn("font-mono text-accent hover:underline text-xs inline-flex items-center gap-1", className)}
+    >
+      {truncAddr(address, chars || 4)}
+      <span className="text-[10px]">↗</span>
+    </a>
   );
 }

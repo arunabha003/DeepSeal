@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useReadContract, useAccount } from "wagmi";
 import { ADDRESSES } from "@/lib/addresses";
 import { ComplianceRegistryABI } from "@/lib/abis";
-import { Card, CardTitle, Stat, Badge, Button } from "@/components/ui";
-import { formatTimestamp, truncAddr } from "@/lib/utils";
+import { Card, CardTitle, Stat, Badge, Button, AddressLink } from "@/components/ui";
+import { formatTimestamp } from "@/lib/utils";
 
 export default function CompliancePage() {
   const { address } = useAccount();
@@ -61,7 +61,7 @@ export default function CompliancePage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted">Address</span>
-              <code className="text-xs font-mono text-zinc-300">{queryAddr}</code>
+              <AddressLink address={queryAddr} chars={8} />
             </div>
 
             <div className="grid grid-cols-2 gap-4 pt-2">
@@ -96,6 +96,14 @@ export default function CompliancePage() {
                     : `${(rec.attestationHash as string).slice(0, 14)}...`
                 }
               />
+            </div>
+
+            {/* Contract details */}
+            <div className="pt-2 border-t border-surface-3 space-y-2 text-[11px]">
+              <div className="flex justify-between">
+                <span className="text-muted">Registry Contract</span>
+                <AddressLink address={ADDRESSES.ComplianceRegistry} chars={6} />
+              </div>
             </div>
 
             {rec.attestationHash !==
@@ -140,7 +148,7 @@ function WalletQuickCheck({ address }: { address: string }) {
     <Card>
       <CardTitle>Your Wallet</CardTitle>
       <div className="flex items-center justify-between">
-        <code className="text-xs font-mono text-zinc-400">{truncAddr(address)}</code>
+        <AddressLink address={address} chars={6} />
         <Badge variant={isApproved ? "success" : "default"}>
           {isApproved ? "COMPLIANT" : "NOT COMPLIANT"}
         </Badge>

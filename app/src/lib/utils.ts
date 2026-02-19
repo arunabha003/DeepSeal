@@ -1,3 +1,5 @@
+import { BLOCK_EXPLORER, ERC8004_EXPLORER, ERC8004_CHAIN_SLUG } from "@/lib/network";
+
 export function truncAddr(addr: string, chars = 4): string {
   if (!addr || addr.length < 10) return addr || "";
   return `${addr.slice(0, chars + 2)}...${addr.slice(-chars)}`;
@@ -35,4 +37,27 @@ export function parseUnits(value: string, decimals: number): bigint {
 
 export function cn(...classes: (string | false | undefined | null)[]): string {
   return classes.filter(Boolean).join(" ");
+}
+
+/* ── Block explorer link helpers ────────────────────── */
+export function txUrl(hash: string): string {
+  return `${BLOCK_EXPLORER}/tx/${hash}`;
+}
+
+export function addressUrl(addr: string): string {
+  return `${BLOCK_EXPLORER}/address/${addr}`;
+}
+
+export function tokenUrl(addr: string, id?: string | number | bigint): string {
+  if (id !== undefined) return `${BLOCK_EXPLORER}/token/${addr}?a=${id}`;
+  return `${BLOCK_EXPLORER}/token/${addr}`;
+}
+
+/* ── ERC-8004 explorer link helpers ────────────────── */
+export function agentUrl(agentId: string | number | bigint): string {
+  return `${ERC8004_EXPLORER}/agents/${ERC8004_CHAIN_SLUG}/${agentId}`;
+}
+
+export function erc8004ExplorerUrl(): string {
+  return `${ERC8004_EXPLORER}/agents`;
 }

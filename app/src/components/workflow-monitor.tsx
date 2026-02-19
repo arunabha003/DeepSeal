@@ -2,6 +2,10 @@
 
 import { useCallback, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { txUrl } from "@/lib/utils";
+
+const isEvmAddress = (value: unknown): value is string =>
+  typeof value === "string" && /^0x[0-9a-fA-F]{40}$/.test(value);
 
 /* ── Types ───────────────────────────────────────────────────────────── */
 type StepStatus = "pending" | "running" | "complete" | "error";
@@ -289,30 +293,113 @@ export function WorkflowMonitor({
 
                   {/* KYB data card */}
                   {step?.data && p.id === "kyb" && (
-                    <div className="mt-2 p-2.5 rounded bg-surface-2/50 border border-surface-3/50 grid grid-cols-3 gap-3 text-[11px]">
-                      <div>
-                        <span className="text-muted block">Provider</span>
-                        <span className="font-mono text-white">Sumsub</span>
+                    <div className="mt-2 space-y-2">
+                      <div className="p-2.5 rounded bg-surface-2/50 border border-surface-3/50 grid grid-cols-3 gap-3 text-[11px]">
+                        <div>
+                          <span className="text-muted block">Provider</span>
+                          <span className="font-mono text-white">Sumsub</span>
+                        </div>
+                        <div>
+                          <span className="text-muted block">Status</span>
+                          <span
+                            className={cn(
+                              "font-mono font-bold",
+                              step.data.providerStatus === "APPROVED"
+                                ? "text-success"
+                                : "text-danger"
+                            )}
+                          >
+                            {String(step.data.providerStatus)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted block">Provider Score</span>
+                          <span className="font-mono text-white">
+                            {String(step.data.providerScore)} / 1000
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-muted block">Status</span>
-                        <span
-                          className={cn(
-                            "font-mono font-bold",
-                            step.data.providerStatus === "APPROVED"
-                              ? "text-success"
-                              : "text-danger"
-                          )}
-                        >
-                          {String(step.data.providerStatus)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-muted block">x402 Payment</span>
-                        <span className="font-mono text-accent">
-                          {step.data.x402Payment ? "✓ USDC paid" : "free"}
-                        </span>
-                      </div>
+
+                      {/* x402 Payment Details */}
+                      {Boolean(step.data.x402Payment) && (
+                        <div className="p-2.5 rounded bg-accent/5 border border-accent/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-[10px] font-semibold uppercase tracking-widest text-accent">
+                              x402 Payment
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-mono">
+                              ✓ verified
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                            <div>
+                              <span className="text-muted block">Amount</span>
+                              <span className="font-mono text-white font-bold">
+                                {String(step.data.x402Amount || "0.01")}{" "}
+                                <span className="text-accent">{String(step.data.x402Asset || "USDC")}</span>
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted block">Network</span>
+                              <span className="font-mono text-white">
+                                {String(step.data.x402Network || "base-sepolia")}
+                              </span>
+                            </div>
+                            {isEvmAddress(step.data.x402Payer) && (
+                              <div>
+                                <span className="text-muted block">Payer</span>
+                                <a
+                                  href={`https://sepolia.basescan.org/address/${step.data.x402Payer}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-mono text-accent hover:underline inline-flex items-center gap-0.5"
+                                >
+                                  {step.data.x402Payer.slice(0, 8)}...{step.data.x402Payer.slice(-4)}
+                                  <span className="text-[9px]">↗</span>
+                                </a>
+                              </div>
+                            )}
+                            {isEvmAddress(step.data.x402PayTo) && (
+                              <div>
+                                <span className="text-muted block">Recipient</span>
+                                <a
+                                  href={`https://sepolia.basescan.org/address/${step.data.x402PayTo}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-mono text-accent hover:underline inline-flex items-center gap-0.5"
+                                >
+                                  {step.data.x402PayTo.slice(0, 8)}...{step.data.x402PayTo.slice(-4)}
+                                  <span className="text-[9px]">↗</span>
+                                </a>
+                              </div>
+                            )}
+                            <div>
+                              <span className="text-muted block">Protocol</span>
+                              <span className="font-mono text-zinc-400">
+                                {String(step.data.x402Protocol || "EIP-3009")}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted block">Scheme</span>
+                              <span className="font-mono text-zinc-400">
+                                {String(step.data.x402Scheme || "exact")}
+                              </span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted block">USDC Contract</span>
+                              <a
+                                href={`https://sepolia.basescan.org/address/${String(step.data.x402AssetAddress || "")}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-mono text-accent/70 hover:underline text-[10px] inline-flex items-center gap-0.5"
+                              >
+                                {String(step.data.x402AssetAddress || "")}
+                                <span className="text-[9px]">↗</span>
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -401,9 +488,15 @@ export function WorkflowMonitor({
                       {step.data.txHash ? (
                         <div className="flex gap-2">
                           <span className="text-muted w-14">TX</span>
-                          <span className="font-mono text-accent break-all">
+                          <a
+                            href={txUrl(String(step.data.txHash))}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-accent hover:underline break-all inline-flex items-center gap-1"
+                          >
                             {String(step.data.txHash)}
-                          </span>
+                            <span className="text-[9px]">↗</span>
+                          </a>
                         </div>
                       ) : null}
                       {step.data.blockNumber ? (
@@ -411,6 +504,14 @@ export function WorkflowMonitor({
                           <span className="text-muted w-14">Block</span>
                           <span className="font-mono text-white">
                             {String(step.data.blockNumber)}
+                          </span>
+                        </div>
+                      ) : null}
+                      {step.data.gasUsed ? (
+                        <div className="flex gap-2">
+                          <span className="text-muted w-14">Gas</span>
+                          <span className="font-mono text-zinc-400">
+                            {String(step.data.gasUsed)}
                           </span>
                         </div>
                       ) : null}
@@ -464,10 +565,16 @@ export function WorkflowMonitor({
           <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-[11px]">
             <div>
               <span className="text-muted block mb-0.5">Subject</span>
-              <span className="font-mono text-white break-all text-xs">
+              <a
+                href={`https://sepolia.basescan.org/address/${String(simResult.subject)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-accent hover:underline break-all text-xs inline-flex items-center gap-1"
+              >
                 {String(simResult.subject).slice(0, 10)}...
                 {String(simResult.subject).slice(-6)}
-              </span>
+                <span className="text-[9px]">↗</span>
+              </a>
             </div>
             <div>
               <span className="text-muted block mb-0.5">Approved</span>
@@ -489,10 +596,19 @@ export function WorkflowMonitor({
             <div>
               <span className="text-muted block mb-0.5">Report Hash</span>
               <span className="font-mono text-zinc-400 break-all">
-                {String(simResult.reportHash || "").slice(0, 14)}...
+                {String(simResult.reportHash || simResult.attestationHash || "").slice(0, 14)}...
               </span>
             </div>
           </div>
+          {/* Full attestation hash for verification */}
+          {!!(simResult.reportHash || simResult.attestationHash) && (
+            <div className="px-4 pb-4 text-[11px]">
+              <span className="text-muted block mb-0.5">Full Attestation Hash</span>
+              <code className="font-mono text-zinc-500 break-all block">
+                {String(simResult.reportHash || simResult.attestationHash)}
+              </code>
+            </div>
+          )}
         </div>
       )}
 

@@ -23,12 +23,29 @@ const CRE_CWD = path.join(PROJECT_ROOT, "cre", "chainlink-Convergence");
 const PAYLOAD_PATH = path.join(PROJECT_ROOT, "http-payload.local.json");
 const RPC_URL = process.env.RPC_URL || "http://127.0.0.1:8545";
 const DEPLOYER_PK = process.env.DEPLOYER_PRIVATE_KEY as Hex;
+const X402_PAYER = process.env.X402_BUYER_ADDRESS || "";
+const X402_PAY_TO = process.env.X402_PAY_TO || "";
+
+// Network mode: "local" = Anvil fork, "testnet" = real Base Sepolia
+const NETWORK_MODE = process.env.NEXT_PUBLIC_NETWORK || "local";
+const IS_LOCAL = NETWORK_MODE === "local";
 
 const ADDRESSES_FILE = path.join(process.cwd(), "src", "lib", "addresses.ts");
 
 function readAddress(name: string): Hex {
   const content = fs.readFileSync(ADDRESSES_FILE, "utf-8");
-  const match = content.match(new RegExp(`"${name}":\\s*"(0x[0-9a-fA-F]+)"`));
+  // Determine which address block to use based on network mode
+  const isTestnet = NETWORK_MODE === "testnet";
+  const blockName = isTestnet ? "TESTNET_ADDRESSES" : "LOCAL_ADDRESSES";
+
+  // Extract the correct block from the TS file
+  const blockRegex = new RegExp(`${blockName}\\s*=\\s*\\{([^}]+)\\}`, "s");
+  const blockMatch = content.match(blockRegex);
+  const searchContent = blockMatch ? blockMatch[1] : content;
+
+  // Match both quoted and unquoted keys: "Key": "0x..." or Key: "0x..."
+  const regex = new RegExp(`["']?${name}["']?:\\s*"(0x[0-9a-fA-F]+)"`);
+  const match = searchContent.match(regex);
   if (!match) throw new Error(`Address not found for ${name}`);
   return match[1] as Hex;
 }
@@ -102,42 +119,51 @@ export async function POST(req: NextRequest) {
           detail: `Payload written for request #${requestId}`,
         });
 
-        // ── Step 2: Sync block timestamp ───────────────────────────
-        send("step", {
-          id: "timestamp",
-          status: "running",
-          label: "Syncing Block Timestamp",
-          detail: "Aligning Anvil block time with wall clock",
-        });
+        // ── Step 2: Sync block timestamp (Anvil only) ─────────────────
+        if (IS_LOCAL) {
+          send("step", {
+            id: "timestamp",
+            status: "running",
+            label: "Syncing Block Timestamp",
+            detail: "Aligning Anvil block time with wall clock",
+          });
 
-        const currentTs = Math.floor(Date.now() / 1000);
-        await fetch(RPC_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: "evm_setNextBlockTimestamp",
-            params: [currentTs],
-            id: 1,
-          }),
-        });
-        await fetch(RPC_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: "evm_mine",
-            params: [],
-            id: 2,
-          }),
-        });
+          const currentTs = Math.floor(Date.now() / 1000);
+          await fetch(RPC_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: "evm_setNextBlockTimestamp",
+              params: [currentTs],
+              id: 1,
+            }),
+          });
+          await fetch(RPC_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: "evm_mine",
+              params: [],
+              id: 2,
+            }),
+          });
 
-        send("step", {
-          id: "timestamp",
-          status: "complete",
-          label: "Syncing Block Timestamp",
-          detail: `Block timestamp set to ${currentTs}`,
-        });
+          send("step", {
+            id: "timestamp",
+            status: "complete",
+            label: "Syncing Block Timestamp",
+            detail: `Block timestamp set to ${currentTs}`,
+          });
+        } else {
+          send("step", {
+            id: "timestamp",
+            status: "complete",
+            label: "Network Mode",
+            detail: `Using real Base Sepolia (${RPC_URL})`,
+          });
+        }
 
         // ── Step 3: Run CRE workflow ───────────────────────────────
         send("step", {
@@ -148,6 +174,8 @@ export async function POST(req: NextRequest) {
         });
 
         const payloadJson = JSON.stringify(payload);
+
+        const creTarget = IS_LOCAL ? "anvil-e2e-settings" : "staging-settings";
 
         const result = await new Promise<{
           output: string;
@@ -161,7 +189,7 @@ export async function POST(req: NextRequest) {
               "simulate",
               "./my-workflow",
               "--target",
-              "anvil-e2e-settings",
+              creTarget,
               "--trigger-index",
               "0",
               "--http-payload",
@@ -244,6 +272,14 @@ export async function POST(req: NextRequest) {
                   providerStatus: kybStatus,
                   providerScore: Number(kybScore),
                   x402Payment: true,
+                  x402Amount: "0.01",
+                  x402Asset: "USDC",
+                  x402AssetAddress: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+                  x402Network: "base-sepolia",
+                  ...(X402_PAYER ? { x402Payer: X402_PAYER } : {}),
+                  ...(X402_PAY_TO ? { x402PayTo: X402_PAY_TO } : {}),
+                  x402Scheme: "exact",
+                  x402Protocol: "EIP-3009 (transferWithAuthorization)",
                 },
               });
             }

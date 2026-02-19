@@ -13,8 +13,10 @@ import {
 import { keccak256, toHex } from "viem";
 import { ADDRESSES } from "@/lib/addresses";
 import { DiligencePortalABI } from "@/lib/abis";
-import { Card, CardTitle, Button, Badge } from "@/components/ui";
+import { Card, CardTitle, Button, Badge, AddressLink, TxLink } from "@/components/ui";
 import { anvilBaseSepolia } from "@/lib/wagmi";
+import { BLOCK_EXPLORER } from "@/lib/network";
+import { txUrl, addressUrl, truncAddr } from "@/lib/utils";
 import Link from "next/link";
 
 export default function SubmitPage() {
@@ -175,9 +177,18 @@ export default function SubmitPage() {
                   Request submitted successfully
                 </span>
               </div>
-              <p className="text-xs font-mono text-muted break-all">
-                tx: {txHash}
-              </p>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted">TX:</span>
+                <a
+                  href={txUrl(txHash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-accent hover:underline break-all inline-flex items-center gap-1"
+                >
+                  {txHash}
+                  <span className="text-[10px]">↗</span>
+                </a>
+              </div>
               <div className="pt-1 border-t border-success/10">
                 <p className="text-xs text-zinc-400 mb-2">
                   Request is on-chain. Now run the CRE workflow to process it:
@@ -248,9 +259,7 @@ function RequestRow({ requestId }: { requestId: number }) {
     <div className="flex items-center justify-between py-2.5 border-b border-surface-3 last:border-0">
       <div className="flex items-center gap-3">
         <span className="text-xs font-mono text-accent">#{requestId}</span>
-        <code className="text-xs font-mono text-zinc-400">
-          {req.subject?.slice(0, 10)}...{req.subject?.slice(-6)}
-        </code>
+        <AddressLink address={req.subject || ""} chars={6} />
       </div>
       <div className="flex items-center gap-3">
         <span className="text-xs text-muted">{req.metadataUri}</span>

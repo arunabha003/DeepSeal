@@ -10,8 +10,9 @@ import {
   IdentityRegistryABI,
   RWAComplianceReceiverABI,
 } from "@/lib/abis";
-import { Card, CardTitle, Stat, Badge, StatusDot } from "@/components/ui";
-import { truncAddr, formatUnits } from "@/lib/utils";
+import { Card, CardTitle, Stat, Badge, StatusDot, AddressLink } from "@/components/ui";
+import { truncAddr, formatUnits, addressUrl } from "@/lib/utils";
+import { NETWORK, IS_LOCAL, BLOCK_EXPLORER } from "@/lib/network";
 import Link from "next/link";
 
 export default function Dashboard() {
@@ -77,9 +78,14 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Protocol Dashboard</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-white">Protocol Dashboard</h1>
+          <Badge variant={IS_LOCAL ? "warning" : "accent"}>
+            {IS_LOCAL ? "⚙ Local (Anvil)" : "🌐 Base Sepolia"}
+          </Badge>
+        </div>
         <p className="text-sm text-muted mt-1">
-          Confidential RWA Due-Diligence Vault -- live on-chain state
+          Confidential RWA Due-Diligence Vault — live on-chain state
         </p>
       </div>
 
@@ -106,7 +112,7 @@ export default function Dashboard() {
           {Object.entries(ADDRESSES).map(([name, addr]) => (
             <div key={name} className="flex items-center justify-between py-1.5 border-b border-surface-3 last:border-0">
               <span className="text-sm text-zinc-300">{name}</span>
-              <code className="text-xs font-mono text-muted">{addr}</code>
+              <AddressLink address={addr} chars={8} />
             </div>
           ))}
         </div>
@@ -119,11 +125,11 @@ export default function Dashboard() {
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-muted">Owner</span>
-              <code className="font-mono text-xs text-zinc-300">{truncAddr(registryOwner as string)}</code>
+              <AddressLink address={(registryOwner as string) || ""} chars={6} />
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted">Workflow Operator</span>
-              <code className="font-mono text-xs text-zinc-300">{truncAddr(workflowOperator as string)}</code>
+              <AddressLink address={(workflowOperator as string) || ""} chars={6} />
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted">Operator = Receiver?</span>
@@ -145,11 +151,9 @@ export default function Dashboard() {
               <span className="text-muted">Forwarder</span>
               <div className="flex items-center gap-2">
                 <StatusDot active={receiverForwarder !== "0x0000000000000000000000000000000000000000"} />
-                <code className="font-mono text-xs text-zinc-300">
-                  {receiverForwarder === "0x0000000000000000000000000000000000000000"
-                    ? "Open (anyone)"
-                    : truncAddr(receiverForwarder as string)}
-                </code>
+                {receiverForwarder === "0x0000000000000000000000000000000000000000"
+                  ? <span className="text-xs text-zinc-300">Open (anyone)</span>
+                  : <AddressLink address={(receiverForwarder as string) || ""} chars={6} />}
               </div>
             </div>
             <div className="flex justify-between text-sm">
