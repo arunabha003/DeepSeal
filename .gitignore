@@ -15,5 +15,10 @@ cre/**/http-test.json
 cre/**/my-workflow/build/
 cre/**/my-workflow/test-out.*
 cre/**/my-workflow/cfg.json
+cre/chainlink-Convergence/.env
+services/kyb-provider/.env
+cre/chainlink-Convergence/my-workflow/config.*.local.json
+cre/chainlink-Convergence/my-workflow/config.*.private.json
+cre/chainlink-Convergence/my-workflow/config.*.secrets.json
 STATUS.d
 .next/

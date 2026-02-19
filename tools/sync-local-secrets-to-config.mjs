@@ -8,6 +8,7 @@ const getArg = (name, fallback = undefined) => {
 
 const envPath = getArg("--env", "cre/chainlink-Convergence/.env");
 const configPath = getArg("--config", "cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json");
+const trackedConfigPattern = /cre\/chainlink-Convergence\/my-workflow\/config\.(anvil-e2e|staging|production)\.json$/;
 
 const parseEnv = (raw) => {
   const out = {};
@@ -38,6 +39,10 @@ try {
   console.log(`Updated ${configPath}`);
   console.log(`- geminiApiKey: ${gemini ? `set (len=${gemini.length})` : "empty"}`);
   console.log(`- x402BuyerPrivateKey: ${x402Buyer ? "set" : "empty"}`);
+  if (trackedConfigPattern.test(configPath.replace(/\\/g, "/"))) {
+    console.log("⚠️  This is a tracked config file. Reset it before commit:");
+    console.log(`   git restore --worktree ${configPath}`);
+  }
 } catch (err) {
   console.error(`Failed: ${err?.message || err}`);
   process.exit(1);
