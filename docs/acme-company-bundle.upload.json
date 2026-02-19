@@ -1,0 +1,39 @@
+{
+  "bundleVersion": "1.0",
+  "bundleType": "rwa-diligence",
+  "createdAt": "2026-02-19T00:00:00Z",
+  "companyInfo": {
+    "legalName": "Acme Renewables Ltd",
+    "companyName": "Acme Renewables Ltd",
+    "country": "GBR",
+    "registrationNumber": "09283746",
+    "website": "https://acme-renewables.example"
+  },
+  "businessProfile": {
+    "industry": "Energy Infrastructure",
+    "incorporatedOn": "2018-04-12",
+    "registeredAddress": "10 St. Bride Street, London, EC4A 4AD, United Kingdom"
+  },
+  "documents": [
+    {
+      "type": "certificate_of_incorporation",
+      "fileName": "certificate-of-incorporation.pdf",
+      "sha256": "b9d3d84f3f6305f49dd1f142ea9c2c334c5893feaf6c0e0132e9cfc4e6c6d609"
+    },
+    {
+      "type": "articles_of_association",
+      "fileName": "articles-of-association.pdf",
+      "sha256": "47c572f3c2c91f9f9200d0ed5f67ee05af7d868f1836fe2d434176f5521c7d20"
+    },
+    {
+      "type": "beneficial_owners_register",
+      "fileName": "ubo-register.csv",
+      "sha256": "d102e5e4f4e11a730d2446f8b03c7064ab30953ac7e0e2b39bc0d57ab2f8d7a8"
+    }
+  ],
+  "attestations": {
+    "issuerSigned": false,
+    "signerAddress": null,
+    "signature": null
+  }
+}

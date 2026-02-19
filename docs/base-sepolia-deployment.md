@@ -90,8 +90,6 @@ X402_PAY_TO=<X402_RECIPIENT_ADDRESS>
   "gasLimit": "1000000",
   "kybUrl": "http://127.0.0.1:3001/kyb",
   "documentResolverUrl": "http://127.0.0.1:3001/docs/resolve",
-  "requireDocumentResolution": true,
-  "allowPayloadCompanyInfoFallback": false,
   "geminiModel": "gemini-2.5-flash",
   "geminiApiKey": "<your_gemini_api_key>",
   "x402BuyerPrivateKey": "",

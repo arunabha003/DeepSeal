@@ -7,7 +7,7 @@ end-to-end compliance pipeline:
 2. **Resolves and verifies** the document bundle from `metadataUri` via secure resolver (`/docs/resolve`)
 3. **Extracts deterministic fields** (`companyInfo`) and records extraction provenance hashes
 4. **Calls KYB provider** (Sumsub sandbox) via x402 micropayment rail
-5. **Calls Gemini AI** for structured risk scoring with model fallback
+5. **Calls Gemini AI** for structured risk scoring with model auto-retry
 6. **Writes** the decision on-chain to `RWAComplianceReceiver.onReport()` → updates `ComplianceRegistry` + triggers ERC-8004 agent side effects
 
 ## Key Files
@@ -67,5 +67,4 @@ Optional (for x402 paid KYB path):
 ## Trigger Options
 
 - **HTTP trigger** (default): POST `{ requestId }` — document fields are resolved from onchain `metadataUri`
-- **Fallback mode (non-production)**: POST `{ requestId, companyInfo }` only if `allowPayloadCompanyInfoFallback=true`
 - **EVM log trigger**: Listen to `DiligencePortal.DiligenceRequested(...)` for production use

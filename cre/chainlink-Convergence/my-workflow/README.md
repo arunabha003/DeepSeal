@@ -32,8 +32,6 @@ Then edit the selected file:
  - Optional:
    - `useConfidentialHttp` (explicit Confidential HTTP client)
    - `x402Enabled` (should match whether KYB is paywalled on `POST /kyb`)
-   - `requireDocumentResolution` (default/production: `true`)
-   - `allowPayloadCompanyInfoFallback` (production: `false`; local-only recovery switch)
    - `geminiApiKey` / `x402BuyerPrivateKey` (local simulation fallback when CRE secrets are not linked)
    - `docResolverApiKey` (optional shared key for resolver endpoint)
 
@@ -68,20 +66,7 @@ PAYLOAD=$(jq -c . ../http-payload.json)
 cre workflow simulate ./my-workflow --target anvil-e2e-settings --trigger-index 0 --http-payload "$PAYLOAD"
 ```
 
-Example `../http-payload.json` (production path):
+Example `../http-payload.json`:
 ```json
 { "requestId": 1 }
-```
-
-Fallback payload (only when `allowPayloadCompanyInfoFallback=true`):
-```json
-{
-  "requestId": 1,
-  "companyInfo": {
-    "companyName": "Acme LLC",
-    "country": "USA",
-    "registrationNumber": "1234567",
-    "website": "https://acme.example"
-  }
-}
 ```
