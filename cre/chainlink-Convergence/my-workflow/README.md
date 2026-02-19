@@ -15,6 +15,7 @@ This workflow processes an onchain diligence request stored in `DiligencePortal`
 Create `../.env` from `../.env.example` and set:
 - `CRE_ETH_PRIVATE_KEY` (funded on Sepolia if you broadcast)
 - `GEMINI_API_KEY`
+- `X402_BUYER_PRIVATE_KEY` (required when `x402Enabled=true`)
 
 ## 3) Configure workflow
 Pick one config file:
@@ -34,8 +35,17 @@ Then edit the selected file:
 - x402 buyer retries are implemented for both HTTP client paths.
 - For paid mode, set:
   - workflow `kybUrl` to `/kyb`
-  - `x402Enabled=true`
-  - `X402_BUYER_PRIVATE_KEY` in CRE secret manager or config fallback
+ - `x402Enabled=true`
+ - `X402_BUYER_PRIVATE_KEY` in CRE secret manager or config fallback
+  - Local fallback helper:
+    - `node ../../tools/sync-local-secrets-to-config.mjs --config ./config.anvil-e2e.json`
+    - `node ../../tools/sync-local-secrets-to-config.mjs --config ./config.staging.json`
+
+If you use local fallback, reset config files before commit:
+```bash
+git restore --worktree cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json
+git restore --worktree cre/chainlink-Convergence/my-workflow/config.staging.json
+```
 
 ## 4) Run KYB provider (local)
 In repo root:

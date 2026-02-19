@@ -122,8 +122,16 @@ forge script script/Deploy.s.sol:Deploy --rpc-url "$RPC_URL" --broadcast
 ## 4) Auto-wire CRE config + sync secrets
 ```bash
 node tools/sync-cre-config.mjs --chain-id 84532 --config cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json
-node tools/sync-local-secrets-to-config.mjs
+node tools/sync-local-secrets-to-config.mjs --config cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json
+node tools/sync-local-secrets-to-config.mjs --config cre/chainlink-Convergence/my-workflow/config.staging.json
 ```
+
+> `sync-local-secrets-to-config.mjs` writes `GEMINI_API_KEY` and `X402_BUYER_PRIVATE_KEY` into workflow config files for local simulation fallback.
+> Before any git commit, reset these files:
+> ```bash
+> git restore --worktree cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json
+> git restore --worktree cre/chainlink-Convergence/my-workflow/config.staging.json
+> ```
 
 ## 5) Sync frontend addresses
 ```bash
