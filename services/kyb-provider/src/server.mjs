@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'
 import crypto from 'node:crypto'
 import express from 'express'
-import { createPublicClient, createWalletClient, hashDomain, http, isAddress, publicActions } from 'viem'
+import { createPublicClient, createWalletClient, hashDomain, http, isAddress, keccak256, publicActions, toHex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { avalanche, avalancheFuji, base, baseSepolia, polygon, polygonAmoy } from 'viem/chains'
 
@@ -165,11 +165,139 @@ const sumsubBaseUrl = String(process.env.SUMSUB_BASE_URL || 'https://api.sumsub.
 const sumsubToken = process.env.SUMSUB_APP_TOKEN
 const sumsubSecret = process.env.SUMSUB_SECRET_KEY || process.env.SUMSUB_SECRET
 const sumsubLevelName = process.env.SUMSUB_LEVEL_NAME
+const docResolverApiKey = String(process.env.DOC_RESOLVER_API_KEY || '').trim()
+const docResolverIpfsGateway = String(process.env.DOC_RESOLVER_IPFS_GATEWAY || 'https://ipfs.io/ipfs').replace(/\/+$/, '')
+const docResolverAllowInsecureHttp = String(process.env.DOC_RESOLVER_ALLOW_INSECURE_HTTP || 'false').toLowerCase() === 'true'
+const docResolverTimeoutMs = Number(process.env.DOC_RESOLVER_TIMEOUT_MS || 15000)
+const docResolverMaxBytes = Number(process.env.DOC_RESOLVER_MAX_BYTES || 2_000_000)
+const docResolverAllowedHosts = String(process.env.DOC_RESOLVER_ALLOWED_HOSTS || '')
+  .split(',')
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean)
 
 const hmacSha256Hex = (secretKey, msg) =>
   crypto.createHmac('sha256', secretKey).update(msg, 'utf8').digest('hex')
 
 const sha256Hex = (msg) => crypto.createHash('sha256').update(msg, 'utf8').digest('hex')
+
+const canonicalStringify = (value) => {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map((entry) => canonicalStringify(entry)).join(',')}]`
+  const entries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b))
+  const body = entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalStringify(v)}`).join(',')
+  return `{${body}}`
+}
+
+const normalizeCompanyInfo = (candidate) => {
+  if (!candidate || typeof candidate !== 'object') return null
+  const companyName = String(candidate.companyName || candidate.name || '').trim()
+  const country = String(candidate.country || candidate.countryCode || '').trim()
+  if (!companyName || !country) return null
+  const registrationNumber = String(
+    candidate.registrationNumber || candidate.regNumber || candidate.companyNumber || '',
+  ).trim()
+  const website = String(candidate.website || candidate.url || '').trim()
+  return {
+    companyName,
+    country,
+    ...(registrationNumber ? { registrationNumber } : {}),
+    ...(website ? { website } : {}),
+  }
+}
+
+const extractCompanyInfoFromDocument = (doc) => {
+  const candidates = [
+    doc?.companyInfo,
+    doc?.fixedInfo?.companyInfo,
+    doc?.company,
+    doc?.issuer?.companyInfo,
+    doc?.extracted?.companyInfo,
+    doc?.fields,
+  ]
+
+  for (const candidate of candidates) {
+    const normalized = normalizeCompanyInfo(candidate)
+    if (normalized) return normalized
+  }
+
+  throw new Error(
+    'Could not extract company info from document bundle. Expected companyName and country in companyInfo/fixedInfo.companyInfo/company/issuer.companyInfo.',
+  )
+}
+
+const resolveMetadataUriToHttpUrl = (metadataUri) => {
+  if (typeof metadataUri !== 'string' || metadataUri.length === 0) {
+    throw new Error('metadataUri is required')
+  }
+  if (metadataUri.startsWith('ipfs://')) {
+    const suffix = metadataUri.slice('ipfs://'.length).replace(/^\/+/, '')
+    if (!suffix) throw new Error('Invalid ipfs:// URI')
+    return `${docResolverIpfsGateway}/${suffix}`
+  }
+  if (metadataUri.startsWith('https://')) return metadataUri
+  if (metadataUri.startsWith('http://')) {
+    if (!docResolverAllowInsecureHttp) {
+      throw new Error('Insecure HTTP metadataUri blocked. Set DOC_RESOLVER_ALLOW_INSECURE_HTTP=true for local testing.')
+    }
+    return metadataUri
+  }
+  throw new Error('Unsupported metadataUri protocol. Use ipfs:// or https://')
+}
+
+const assertAllowedHost = (urlStr) => {
+  if (docResolverAllowedHosts.length === 0) return
+  const host = new URL(urlStr).host.toLowerCase()
+  if (!docResolverAllowedHosts.includes(host)) {
+    throw new Error(`metadataUri host ${host} is not in DOC_RESOLVER_ALLOWED_HOSTS allowlist`)
+  }
+}
+
+const fetchDocumentBytes = async (urlStr) => {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort('timeout'), docResolverTimeoutMs)
+  try {
+    const res = await fetch(urlStr, { method: 'GET', signal: controller.signal, headers: { accept: 'application/json' } })
+    if (!res.ok) throw new Error(`Document fetch failed: status=${res.status}`)
+
+    const bytes = new Uint8Array(await res.arrayBuffer())
+    if (bytes.length === 0) throw new Error('Document fetch returned empty body')
+    if (bytes.length > docResolverMaxBytes) {
+      throw new Error(`Document size ${bytes.length} exceeds DOC_RESOLVER_MAX_BYTES=${docResolverMaxBytes}`)
+    }
+    return bytes
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+const resolveAndExtractDocumentBundle = async ({ metadataUri, docBundleHash }) => {
+  const url = resolveMetadataUriToHttpUrl(metadataUri)
+  assertAllowedHost(url)
+  const bytes = await fetchDocumentBytes(url)
+  const sourceHash = keccak256(toHex(bytes))
+
+  if (docBundleHash && String(docBundleHash).toLowerCase() !== sourceHash.toLowerCase()) {
+    throw new Error(`Document hash mismatch: expected=${docBundleHash} actual=${sourceHash}`)
+  }
+
+  let json
+  try {
+    json = JSON.parse(Buffer.from(bytes).toString('utf8'))
+  } catch (e) {
+    throw new Error(`Document bundle is not valid JSON: ${String(e?.message || e)}`)
+  }
+
+  const companyInfo = extractCompanyInfoFromDocument(json)
+  const extractionHash = keccak256(toHex(canonicalStringify(companyInfo)))
+
+  return {
+    metadataUri,
+    resolvedUrl: url,
+    sourceHash,
+    extractionHash,
+    companyInfo,
+  }
+}
 
 const sumsubRequest = async ({ method, path, body }) => {
   if (!sumsubEnabled) {
@@ -331,6 +459,24 @@ app.get('/sumsub/healthz', async (_req, res) => {
       authValid: false,
       error: String(e?.message || e),
     })
+  }
+})
+
+app.post('/docs/resolve', async (req, res) => {
+  try {
+    if (docResolverApiKey) {
+      const key = String(req.header('x-doc-resolver-key') || '').trim()
+      if (key !== docResolverApiKey) {
+        return res.status(401).json({ error: 'Unauthorized doc resolver key' })
+      }
+    }
+
+    const metadataUri = req.body?.metadataUri
+    const docBundleHash = req.body?.docBundleHash
+    const resolved = await resolveAndExtractDocumentBundle({ metadataUri, docBundleHash })
+    return res.status(200).json(resolved)
+  } catch (e) {
+    return res.status(400).json({ error: String(e?.message || e) })
   }
 })
 
