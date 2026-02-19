@@ -212,8 +212,24 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
             }
         }
 
-        IValidationRegistry val = validationRegistry;
+        // Give reputation feedback to validation agent (different agentId) so it is
+        // visible on 8004scan via the official ReputationRegistry.
+        // NOTE: the receiver must NOT be an approved operator of validationAgentId in the
+        // IdentityRegistry — otherwise ReputationRegistry rejects it as self-feedback.
         uint256 valAgent = validationAgentId;
+        if (address(rep) != address(0) && valAgent != 0 && valAgent != repAgent) {
+            int128 valValue = int128(uint128(_toValidationResponse(approved, riskScore)));
+            bytes32 valFeedbackHash = keccak256(abi.encode(subject, approved, riskScore, attestationHash, "validation", block.timestamp));
+            try rep.giveFeedback(
+                valAgent, valValue, 0, "validation", approved ? "validated" : "rejected", "", "", valFeedbackHash
+            ) {
+                emit ERC8004ReputationWritten(valAgent, valValue, 0, valFeedbackHash);
+            } catch (bytes memory reason) {
+                emit ERC8004ReputationWriteFailed(valAgent, reason);
+            }
+        }
+
+        IValidationRegistry val = validationRegistry;
         address responder = validationResponder;
         if (address(val) != address(0) && responder != address(0)) {
             bytes32 requestHash = keccak256(abi.encode(subject, attestationHash, valAgent, block.timestamp, address(this)));
