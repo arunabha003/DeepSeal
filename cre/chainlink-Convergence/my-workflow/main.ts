@@ -101,9 +101,22 @@ const getOptionalConfigSecret = (runtime: Runtime<Config>, id: string): string =
 	return ''
 }
 
+const getOptionalEnvSecret = (id: string): string => {
+	try {
+		const proc = (globalThis as any)?.process
+		const raw = proc?.env?.[id]
+		return typeof raw === 'string' ? raw.trim() : ''
+	} catch {
+		return ''
+	}
+}
+
 const getRequiredSecret = (runtime: Runtime<Config>, id: string): string => {
 	const cfgValue = getOptionalConfigSecret(runtime, id)
 	if (cfgValue) return cfgValue
+
+	const envValue = getOptionalEnvSecret(id)
+	if (envValue) return envValue
 
 	try {
 		const secret = runtime.getSecret({ id }).result()
@@ -113,8 +126,16 @@ const getRequiredSecret = (runtime: Runtime<Config>, id: string): string => {
 		}
 		return value
 	} catch (e: any) {
+		const fallbackEnvValue = getOptionalEnvSecret(id)
+		if (fallbackEnvValue) return fallbackEnvValue
+		const cause = String(e?.message || e || '')
+		if (/RunInNodeMode/i.test(cause)) {
+			throw new Error(
+				`Missing secret: ${id}. In local simulation, sync secrets into workflow config first (node tools/sync-local-secrets-to-config.mjs). Cause: ${cause}`,
+			)
+		}
 		throw new Error(
-			`Missing secret: ${id}. Set ${id} in CRE secrets manager or provide fallback in workflow config (geminiApiKey/x402BuyerPrivateKey) for local simulation. Cause: ${e?.message || e}`,
+			`Missing secret: ${id}. Set ${id} in CRE secrets manager, pass it via runtime env (e.g. -e .env), or provide fallback in workflow config (geminiApiKey/x402BuyerPrivateKey). Cause: ${cause}`,
 		)
 	}
 }
@@ -357,6 +378,7 @@ const fetchKybHttp = (
 	req: DiligenceRequest,
 	runtime: Runtime<Config>,
 	companyInfo?: any,
+	x402BuyerPrivateKey?: string,
 ): KYBResult => {
 	const body = Buffer.from(
 		new TextEncoder().encode(
@@ -380,7 +402,12 @@ const fetchKybHttp = (
 
 	// x402 buyer flow (optional): if paywalled, retry with X-PAYMENT
 	if (initial.statusCode === 402 && Boolean(config.x402Enabled)) {
-		const buyerPk = getRequiredSecret(runtime, 'X402_BUYER_PRIVATE_KEY') as `0x${string}`
+		const buyerPk = String(x402BuyerPrivateKey || '').trim() as `0x${string}`
+		if (!buyerPk) {
+			throw new Error(
+				'Missing secret: X402_BUYER_PRIVATE_KEY. Set it in CRE secrets manager, pass it via runtime env (-e .env), or provide x402BuyerPrivateKey in workflow config.',
+			)
+		}
 
 		const parsed402 = x402ResponseSchema.parse(safeJsonParse(decodeBodyUtf8(initial.body)))
 		const accept0 = parsed402.accepts[0] as any
@@ -445,6 +472,7 @@ const fetchKybConfidential = (
 	req: DiligenceRequest,
 	runtime: Runtime<Config>,
 	companyInfo?: any,
+	x402BuyerPrivateKey?: string,
 ): KYBResult => {
 	const bodyString = JSON.stringify({
 		subject: req.subject,
@@ -467,7 +495,12 @@ const fetchKybConfidential = (
 		.result()
 
 	if (initial.statusCode === 402 && Boolean(config.x402Enabled)) {
-		const buyerPk = getRequiredSecret(runtime, 'X402_BUYER_PRIVATE_KEY') as `0x${string}`
+		const buyerPk = String(x402BuyerPrivateKey || '').trim() as `0x${string}`
+		if (!buyerPk) {
+			throw new Error(
+				'Missing secret: X402_BUYER_PRIVATE_KEY. Set it in CRE secrets manager, pass it via runtime env (-e .env), or provide x402BuyerPrivateKey in workflow config.',
+			)
+		}
 
 		const parsed402 = x402ResponseSchema.parse(safeJsonParse(decodeBodyUtf8(initial.body)))
 		const accept0 = parsed402.accepts[0] as any
@@ -754,6 +787,7 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 
 	const req = readRequestFromPortal(runtime, requestId)
 	runtime.log(`subject=${req.subject} docBundleHash=${req.docBundleHash} metadataUri=${req.metadataUri}`)
+	const x402BuyerPk = Boolean(runtime.config.x402Enabled) ? getRequiredSecret(runtime, 'X402_BUYER_PRIVATE_KEY') : ''
 
 	const useConf = Boolean(runtime.config.useConfidentialHttp)
 	const kyb = useConf
@@ -761,7 +795,7 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 				.sendRequest(
 					runtime,
 					(sr: ConfidentialHTTPSendRequester, cfg: Config) =>
-						fetchKybConfidential(sr, cfg, req, runtime, companyInfo),
+						fetchKybConfidential(sr, cfg, req, runtime, companyInfo, x402BuyerPk),
 					ConsensusAggregationByFields<KYBResult>({
 						providerStatus: identical,
 						providerScore: median,
@@ -772,7 +806,7 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 		: new HTTPClient()
 				.sendRequest(
 					runtime,
-					(sr: HTTPSendRequester, cfg: Config) => fetchKybHttp(sr, cfg, req, runtime, companyInfo),
+					(sr: HTTPSendRequester, cfg: Config) => fetchKybHttp(sr, cfg, req, runtime, companyInfo, x402BuyerPk),
 					ConsensusAggregationByFields<KYBResult>({
 						providerStatus: identical,
 						providerScore: median,
