@@ -97,10 +97,11 @@ contract Deploy is Script {
         cfg.validationAgentUri = vm.envOr("VALIDATION_AGENT_URI", string(""));
 
         if (cfg.useOfficialERC8004) {
-            if (block.chainid == 11155111) {
+            if (block.chainid == 11155111 || block.chainid == 84532) {
+                // Ethereum Sepolia & Base Sepolia share the same official addresses
                 cfg.identityRegistryAddress = ERC8004_SEPOLIA_IDENTITY_REGISTRY;
                 cfg.reputationRegistryAddress = ERC8004_SEPOLIA_REPUTATION_REGISTRY;
-            } else if (block.chainid == 1) {
+            } else if (block.chainid == 1 || block.chainid == 8453) {
                 cfg.identityRegistryAddress = ERC8004_MAINNET_IDENTITY_REGISTRY;
                 cfg.reputationRegistryAddress = ERC8004_MAINNET_REPUTATION_REGISTRY;
             }
@@ -181,13 +182,48 @@ contract Deploy is Script {
             require(funded, "AGENT_REGISTRAR_FUNDING_FAILED");
         }
 
+        // Build proper ERC-8004 JSON metadata URIs for each agent
+        string memory repUri = bytes(cfg.reputationAgentUri).length > 0
+            ? cfg.reputationAgentUri
+            : _buildReputationAgentUri();
+        string memory valUri = bytes(cfg.validationAgentUri).length > 0
+            ? cfg.validationAgentUri
+            : _buildValidationAgentUri();
+
         vm.stopBroadcast();
         vm.startBroadcast(cfg.agentRegistrarKey);
-        out.reputationAgentId = _registerAgent(out.identityRegistry, cfg.reputationAgentUri);
-        out.validationAgentId = _registerAgent(out.identityRegistry, cfg.validationAgentUri);
+        out.reputationAgentId = _registerAgent(out.identityRegistry, repUri);
+        out.validationAgentId = _registerAgent(out.identityRegistry, valUri);
         out.identityRegistry.approve(address(out.receiver), out.validationAgentId);
         vm.stopBroadcast();
         vm.startBroadcast(cfg.deployerKey);
+    }
+
+    /// @dev Build a data URI with ERC-8004 registration-v1 JSON for the reputation agent.
+    function _buildReputationAgentUri() internal pure returns (string memory) {
+        // 8004scan expects: type, name, description, protocol, endpoints, active, supportedTrust
+        string memory json = '{"type":"https://eips.ethereum.org/EIPS/eip-8004#registration-v1",'
+            '"name":"RWA Diligence Reputation Agent",'
+            '"description":"Chainlink CRE-powered reputation agent for the Confidential RWA Due-Diligence Vault. Records on-chain reputation feedback after processing KYB verification, AI risk assessment, and compliance decisions for real-world asset tokenization.",'
+            '"protocol":"chainlink-cre",'
+            '"endpoints":[{"name":"web","endpoint":"https://github.com/arunabha003/Chainlink-Convergence"},{"name":"x402","endpoint":"http://127.0.0.1:3001/kyb","version":"1.0","skills":["kyb-verification","risk-assessment","compliance"],"domains":["rwa","defi","compliance"]}],'
+            '"x402Support":true,'
+            '"active":true,'
+            '"supportedTrust":["reputation"]}';
+        return string.concat("data:application/json;base64,", vm.toBase64(bytes(json)));
+    }
+
+    /// @dev Build a data URI with ERC-8004 registration-v1 JSON for the validation agent.
+    function _buildValidationAgentUri() internal pure returns (string memory) {
+        string memory json = '{"type":"https://eips.ethereum.org/EIPS/eip-8004#registration-v1",'
+            '"name":"RWA Diligence Validation Agent",'
+            '"description":"Chainlink CRE-powered validation agent for the Confidential RWA Due-Diligence Vault. Issues on-chain validation requests and auto-responses after compliance decisions, tracking the full audit trail of KYB and AI risk assessments.",'
+            '"protocol":"chainlink-cre",'
+            '"endpoints":[{"name":"web","endpoint":"https://github.com/arunabha003/Chainlink-Convergence"},{"name":"x402","endpoint":"http://127.0.0.1:3001/kyb","version":"1.0","skills":["validation","compliance-audit","risk-tracking"],"domains":["rwa","defi","compliance"]}],'
+            '"x402Support":true,'
+            '"active":true,'
+            '"supportedTrust":["reputation","validation"]}';
+        return string.concat("data:application/json;base64,", vm.toBase64(bytes(json)));
     }
 
     function _registerAgent(IdentityRegistry identityRegistry, string memory agentUri) internal returns (uint256 agentId) {
