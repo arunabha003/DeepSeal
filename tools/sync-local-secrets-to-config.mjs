@@ -30,15 +30,18 @@ try {
 
   const gemini = String(env.GEMINI_API_KEY || "");
   const x402Buyer = String(env.X402_BUYER_PRIVATE_KEY || "");
+  const docResolverApiKey = String(env.DOC_RESOLVER_API_KEY || "");
 
   cfg.geminiApiKey = gemini;
   cfg.x402BuyerPrivateKey = x402Buyer;
+  cfg.docResolverApiKey = docResolverApiKey;
 
   writeFileSync(configPath, `${JSON.stringify(cfg, null, 2)}\n`);
 
   console.log(`Updated ${configPath}`);
   console.log(`- geminiApiKey: ${gemini ? `set (len=${gemini.length})` : "empty"}`);
   console.log(`- x402BuyerPrivateKey: ${x402Buyer ? "set" : "empty"}`);
+  console.log(`- docResolverApiKey: ${docResolverApiKey ? "set" : "empty"}`);
   if (trackedConfigPattern.test(configPath.replace(/\\/g, "/"))) {
     console.log("⚠️  This is a tracked config file. Reset it before commit:");
     console.log(`   git restore --worktree ${configPath}`);
