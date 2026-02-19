@@ -14,6 +14,7 @@ import { injected } from "wagmi/connectors";
 import { truncAddr } from "@/lib/utils";
 import { anvilBaseSepolia } from "@/lib/wagmi";
 import { ADDRESSES } from "@/lib/addresses";
+import { IS_LOCAL, RPC_URL } from "@/lib/network";
 
 const links = [
   { href: "/", label: "Dashboard" },
@@ -64,7 +65,7 @@ export function Nav() {
             chainId: chainIdHex,
             chainName: anvilBaseSepolia.name,
             nativeCurrency: anvilBaseSepolia.nativeCurrency,
-            rpcUrls: ["http://127.0.0.1:8545", "http://localhost:8545"],
+            rpcUrls: IS_LOCAL ? ["http://127.0.0.1:8545", "http://localhost:8545"] : ["https://sepolia.base.org"],
             blockExplorerUrls: ["https://sepolia.basescan.org"],
           },
         ],
@@ -183,7 +184,7 @@ export function Nav() {
                 {isSwitchingChain ? "Switching..." : "Switch network"}
               </button>
             ) : (
-              <span className="text-[11px] text-zinc-300 whitespace-nowrap">Expected RPC: http://127.0.0.1:8545</span>
+              <span className="text-[11px] text-zinc-300 whitespace-nowrap">Expected RPC: {RPC_URL}</span>
             )}
           </div>
         </div>

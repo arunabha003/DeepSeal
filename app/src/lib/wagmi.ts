@@ -1,12 +1,13 @@
 import { http, createConfig } from "wagmi";
 import { defineChain } from "viem";
+import { RPC_URL, IS_LOCAL } from "./network";
 
 export const anvilBaseSepolia = defineChain({
   id: 84532,
-  name: "Base Sepolia (Local Fork)",
+  name: IS_LOCAL ? "Base Sepolia (Local Fork)" : "Base Sepolia",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: ["http://127.0.0.1:8545"] },
+    default: { http: [RPC_URL] },
   },
   blockExplorers: {
     default: { name: "Basescan", url: "https://sepolia.basescan.org" },
@@ -17,7 +18,7 @@ export const anvilBaseSepolia = defineChain({
 export const config = createConfig({
   chains: [anvilBaseSepolia],
   transports: {
-    [anvilBaseSepolia.id]: http("http://127.0.0.1:8545"),
+    [anvilBaseSepolia.id]: http(RPC_URL),
   },
   ssr: true,
 });
