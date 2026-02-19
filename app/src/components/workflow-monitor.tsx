@@ -40,6 +40,7 @@ const PIPELINE: { id: string; label: string }[] = [
   { id: "timestamp", label: "Syncing Block Timestamp" },
   { id: "cre-init", label: "CRE Workflow Engine" },
   { id: "read-request", label: "Reading On-Chain Request" },
+  { id: "doc-resolve", label: "Resolving + Verifying Document Bundle" },
   { id: "kyb", label: "KYB Verification (Sumsub via x402)" },
   { id: "gemini", label: "AI Risk Assessment (Gemini)" },
   { id: "decision", label: "Final Decision" },
@@ -289,6 +290,36 @@ export function WorkflowMonitor({
                     <p className="text-xs text-muted mt-0.5 font-mono break-all">
                       {detail}
                     </p>
+                  )}
+
+                  {/* Document resolution data card */}
+                  {step?.data && p.id === "doc-resolve" && (
+                    <div className="mt-2 p-2.5 rounded bg-surface-2/50 border border-surface-3/50 text-[11px] space-y-1.5">
+                      {step.data.companyName ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-muted block">Company</span>
+                            <span className="font-mono text-white">{String(step.data.companyName)}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted block">Country</span>
+                            <span className="font-mono text-white">{String(step.data.country)}</span>
+                          </div>
+                        </div>
+                      ) : null}
+                      {step.data.extractionHash ? (
+                        <div>
+                          <span className="text-muted block">Extraction Hash</span>
+                          <span className="font-mono text-zinc-300 break-all">{String(step.data.extractionHash)}</span>
+                        </div>
+                      ) : null}
+                      {step.data.sourceHash ? (
+                        <div>
+                          <span className="text-muted block">Source Hash</span>
+                          <span className="font-mono text-zinc-400 break-all">{String(step.data.sourceHash)}</span>
+                        </div>
+                      ) : null}
+                    </div>
                   )}
 
                   {/* KYB data card */}

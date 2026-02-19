@@ -16,12 +16,6 @@ function ProcessContent() {
   const [requestId, setRequestId] = useState(initialId);
   const [activeId, setActiveId] = useState(initialId ? Number(initialId) : 0);
 
-  /* company info form state */
-  const [companyName, setCompanyName] = useState("Acme LLC");
-  const [country, setCountry] = useState("USA");
-  const [registrationNumber, setRegistrationNumber] = useState("1234567");
-  const [website, setWebsite] = useState("https://acme.example");
-
   /* read the request from chain to show summary */
   const { data: requestData } = useReadContract({
     address: ADDRESSES.DiligencePortal as `0x${string}`,
@@ -101,6 +95,10 @@ function ProcessContent() {
       {req && activeId > 0 && (
         <Card>
           <CardTitle>Request #{activeId} — On-Chain Data</CardTitle>
+          <p className="text-[11px] text-muted mb-3">
+            The workflow resolves <code className="font-mono">{req.metadataUri}</code>, verifies it against{" "}
+            <code className="font-mono">docBundleHash</code>, deterministically extracts company fields, then runs KYB + AI.
+          </p>
           <div className="grid grid-cols-2 gap-4 text-xs">
             <div>
               <span className="text-muted block mb-0.5">Subject</span>
@@ -128,67 +126,10 @@ function ProcessContent() {
         </Card>
       )}
 
-      {/* ── Company info for KYB ──────────────────────────── */}
-      {req && activeId > 0 && (
-        <Card>
-          <CardTitle>Company Info (sent to KYB provider)</CardTitle>
-          <p className="text-[11px] text-muted mb-3">
-            This data is passed to the Sumsub KYB provider via the CRE workflow HTTP trigger.
-            It is NOT stored on-chain — only the compliance decision is.
-          </p>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-muted mb-1">Company Name</label>
-              <input
-                type="text"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                className="w-full text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-muted mb-1">Country</label>
-              <input
-                type="text"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-muted mb-1">
-                Registration #
-              </label>
-              <input
-                type="text"
-                value={registrationNumber}
-                onChange={(e) => setRegistrationNumber(e.target.value)}
-                className="w-full text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-muted mb-1">Website</label>
-              <input
-                type="text"
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                className="w-full text-sm"
-              />
-            </div>
-          </div>
-        </Card>
-      )}
-
       {/* ── Workflow monitor ──────────────────────────────── */}
       {activeId > 0 && req && (
         <WorkflowMonitor
           requestId={activeId}
-          companyInfo={{
-            companyName,
-            country,
-            registrationNumber,
-            website,
-          }}
           onComplete={() => {
             // Could auto-navigate to compliance page
           }}

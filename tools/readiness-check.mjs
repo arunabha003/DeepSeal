@@ -57,6 +57,9 @@ function checkConfig() {
     missing.push("receiverAddress (non-zero)");
   }
   if (!cfg.kybUrl) missing.push("kybUrl");
+  if (cfg.requireDocumentResolution !== false && !cfg.documentResolverUrl) {
+    missing.push("documentResolverUrl (required when requireDocumentResolution=true)");
+  }
   if (!cfg.geminiModel) missing.push("geminiModel");
 
   if (missing.length) {
@@ -110,6 +113,29 @@ function main() {
     die(`KYB provider health check failed: ${kyb.out}`);
   }
 
+  const resolverUrl = cfg.documentResolverUrl || cfg.kybUrl.replace(/\/kyb(?:\/free)?$/i, "/docs/resolve");
+  const resolverProbe = run("curl", [
+    "-s",
+    "-o",
+    "/tmp/doc-resolver-probe.out",
+    "-w",
+    "%{http_code}",
+    "-X",
+    "POST",
+    resolverUrl,
+    "-H",
+    "content-type: application/json",
+    "-d",
+    "{\"metadataUri\":\"ipfs://invalid\",\"docBundleHash\":\"0x1111111111111111111111111111111111111111111111111111111111111111\"}",
+  ]);
+  if (!resolverProbe.ok) {
+    die(`Document resolver probe failed: ${resolverProbe.out}`);
+  }
+  const resolverCode = Number((resolverProbe.out || "").trim());
+  if (![200, 400, 401].includes(resolverCode)) {
+    die(`Document resolver unexpected status code: ${resolverCode}`);
+  }
+
   const sumsubProbe = run("curl", ["-sf", "http://127.0.0.1:3001/sumsub/healthz"]);
   if (!sumsubProbe.ok) {
     console.log("- Sumsub probe: skipped/unreachable (provider may be down or endpoint unavailable)");
@@ -122,6 +148,7 @@ function main() {
   console.log(`- Portal: ${cfg.diligencePortalAddress}`);
   console.log(`- Receiver: ${cfg.receiverAddress}`);
   console.log(`- KYB URL: ${cfg.kybUrl}`);
+  console.log(`- Document Resolver URL: ${resolverUrl}`);
 }
 
 main();

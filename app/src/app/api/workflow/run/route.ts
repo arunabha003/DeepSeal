@@ -25,6 +25,8 @@ const RPC_URL = process.env.RPC_URL || "http://127.0.0.1:8545";
 const DEPLOYER_PK = process.env.DEPLOYER_PRIVATE_KEY as Hex;
 const X402_PAYER = process.env.X402_BUYER_ADDRESS || "";
 const X402_PAY_TO = process.env.X402_PAY_TO || "";
+const ALLOW_DIRECT_SET_APPROVAL_FALLBACK =
+  String(process.env.ALLOW_DIRECT_SET_APPROVAL_FALLBACK || "false").toLowerCase() === "true";
 
 // Network mode: "local" = Anvil fork, "testnet" = real Base Sepolia
 const NETWORK_MODE = process.env.NEXT_PUBLIC_NETWORK || "local";
@@ -101,15 +103,12 @@ export async function POST(req: NextRequest) {
           detail: `Request #${requestId}`,
         });
 
-        const payload = {
+        const payload: Record<string, unknown> = {
           requestId: Number(requestId),
-          companyInfo: companyInfo || {
-            companyName: "Acme LLC",
-            country: "USA",
-            registrationNumber: "1234567",
-            website: "https://acme.example",
-          },
         };
+        if (companyInfo && typeof companyInfo === "object") {
+          payload.companyInfo = companyInfo;
+        }
         fs.writeFileSync(PAYLOAD_PATH, JSON.stringify(payload, null, 2));
 
         send("step", {
@@ -207,6 +206,7 @@ export async function POST(req: NextRequest) {
           let fullOutput = "";
           let resultJson: Record<string, unknown> | null = null;
           let buffer = "";
+          let kybStarted = false;
 
           const processLine = (line: string) => {
             // Strip ANSI color codes
@@ -251,11 +251,74 @@ export async function POST(req: NextRequest) {
                 },
               });
               send("step", {
-                id: "kyb",
+                id: "doc-resolve",
                 status: "running",
-                label: "KYB Verification (Sumsub via x402)",
-                detail: "Calling KYB provider with x402 payment...",
+                label: "Resolving + Verifying Document Bundle",
+                detail: "Fetching metadata bundle and verifying doc hash...",
               });
+            }
+
+            if (trimmed.includes("Document resolved sourceHash=")) {
+              const sourceHashMatch = trimmed.match(/sourceHash=(0x[0-9a-fA-F]+)/);
+              const extractionHashMatch = trimmed.match(/extractionHash=(0x[0-9a-fA-F]+)/);
+              const resolvedUrlMatch = trimmed.match(/resolvedUrl=(\S+)/);
+              send("step", {
+                id: "doc-resolve",
+                status: "complete",
+                label: "Resolving + Verifying Document Bundle",
+                detail: `Verified source hash and extracted normalized company fields`,
+                data: {
+                  sourceHash: sourceHashMatch?.[1],
+                  extractionHash: extractionHashMatch?.[1],
+                  resolvedUrl: resolvedUrlMatch?.[1],
+                },
+              });
+              if (!kybStarted) {
+                kybStarted = true;
+                send("step", {
+                  id: "kyb",
+                  status: "running",
+                  label: "KYB Verification (Sumsub via x402)",
+                  detail: "Calling KYB provider with x402 payment...",
+                });
+              }
+            }
+
+            if (trimmed.includes("Document resolution failed; using payload fallback")) {
+              send("step", {
+                id: "doc-resolve",
+                status: "error",
+                label: "Resolving + Verifying Document Bundle",
+                detail: "Resolver failed; payload fallback was used (non-production mode).",
+              });
+            }
+
+            if (trimmed.includes("Extracted companyInfo")) {
+              const jsonMatch = trimmed.match(/Extracted companyInfo=(\{.*\})$/);
+              let extracted: Record<string, unknown> = {};
+              if (jsonMatch?.[1]) {
+                try {
+                  extracted = JSON.parse(jsonMatch[1]) as Record<string, unknown>;
+                } catch {
+                  extracted = {};
+                }
+              }
+              send("step", {
+                id: "doc-resolve",
+                status: "complete",
+                label: "Resolving + Verifying Document Bundle",
+                detail: `Extraction complete: ${String(extracted.companyName || "company")} (${String(extracted.country || "country")})`,
+                data: extracted,
+              });
+              if (!kybStarted) {
+                kybStarted = true;
+                send("step", {
+                  id: "kyb",
+                  status: "running",
+                  label: "KYB Verification (Sumsub via x402)",
+                  detail: "Calling KYB provider with x402 payment...",
+                });
+              }
             }
 
             if (trimmed.includes("KYB providerStatus=")) {
@@ -569,9 +632,19 @@ export async function POST(req: NextRequest) {
           const errMsg =
             err instanceof Error ? err.message : String(err);
 
-          // Fallback: try setApproval directly on ComplianceRegistry
+          if (!ALLOW_DIRECT_SET_APPROVAL_FALLBACK) {
+            send("step", {
+              id: "onchain-write",
+              status: "error",
+              label: "Broadcasting On-Chain",
+              detail: `onReport failed: ${errMsg.slice(0, 200)}`,
+            });
+            send("done", { requestId });
+            return;
+          }
+
           send("log", {
-            raw: `onReport failed (${errMsg.slice(0, 100)}), falling back to setApproval...`,
+            raw: `onReport failed (${errMsg.slice(0, 100)}), falling back to setApproval (ALLOW_DIRECT_SET_APPROVAL_FALLBACK=true)...`,
             ts: new Date().toISOString(),
           });
 
