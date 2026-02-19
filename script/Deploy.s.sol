@@ -156,7 +156,8 @@ contract Deploy is Script {
         }
 
         if (address(out.reputationRegistry) != address(0)) {
-            out.receiver.setERC8004Reputation(address(out.reputationRegistry), out.reputationAgentId, 0);
+            // valueDecimals=1: raw value -500..+1000 maps to -50..+100 on 8004scan (e.g. 850 → 85/100)
+            out.receiver.setERC8004Reputation(address(out.reputationRegistry), out.reputationAgentId, 1);
         }
 
         if (address(out.validationRegistry) != address(0)) {
@@ -194,7 +195,10 @@ contract Deploy is Script {
         vm.startBroadcast(cfg.agentRegistrarKey);
         out.reputationAgentId = _registerAgent(out.identityRegistry, repUri);
         out.validationAgentId = _registerAgent(out.identityRegistry, valUri);
-        out.identityRegistry.approve(address(out.receiver), out.validationAgentId);
+        // NOTE: do NOT approve(receiver, validationAgentId) here — that would make the receiver
+        // an operator of the validation agent, causing ReputationRegistry.giveFeedback() to
+        // revert with SelfFeedbackNotAllowed. The validation agent gets reputation feedback
+        // recorded on-chain (visible on 8004scan) via the giveFeedback path in the receiver.
         vm.stopBroadcast();
         vm.startBroadcast(cfg.deployerKey);
     }
