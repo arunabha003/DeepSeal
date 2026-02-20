@@ -112,8 +112,8 @@ This document tracks what's implemented in the Confidential RWA Due-Diligence Va
 |----------|------|-------------|
 | `README.md` | Project overview + Chainlink file links |
 | `docs/architecture.md` | Full system architecture with diagrams |
-| `docs/protocol-explainer.md` | Non-technical protocol explanation |
-| `docs/demo-deck.md` | Demo video script and presentation deck |
+| `docs/presentation.html` | Hackathon presentation (interactive HTML) |
+| `docs/architecture-diagram.html` | Visual architecture diagram (interactive HTML) |
 | `docs/anvil-base-sepolia-e2e.md` | Complete Anvil fork setup guide |
 | `docs/base-sepolia-deployment.md` | End-to-end Base Sepolia deployment and simulation runbook |
 | `docs/implementation.md` | This file |

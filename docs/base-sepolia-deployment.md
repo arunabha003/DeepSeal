@@ -8,14 +8,14 @@ This flow runs the full protocol on **real Base Sepolia** using CRE staging simu
 
 | Contract | Address | Basescan |
 |---|---|---|
-| DemoUSD | `0xFb2518e2017b36f00827409153818747A3e6d3f9` | [View](https://sepolia.basescan.org/address/0xFb2518e2017b36f00827409153818747A3e6d3f9) |
-| ComplianceRegistry | `0x590552A4d4eF77F3AbD25C76fA8f304f2388b9e5` | [View](https://sepolia.basescan.org/address/0x590552A4d4eF77F3AbD25C76fA8f304f2388b9e5) |
-| DiligencePortal | `0x337c75270D09A8D8BFCe386F93715E230b39E48c` | [View](https://sepolia.basescan.org/address/0x337c75270D09A8D8BFCe386F93715E230b39E48c) |
-| RWAComplianceReceiver | `0x7cbFd330F61723c215c5061eD3b1A75CCCbF4e42` | [View](https://sepolia.basescan.org/address/0x7cbFd330F61723c215c5061eD3b1A75CCCbF4e42) |
-| RWAVault | `0xF1DBec54913B58f65806C7F77D636b3f40882293` | [View](https://sepolia.basescan.org/address/0xF1DBec54913B58f65806C7F77D636b3f40882293) |
+| DemoUSD | `0x523E3033F844B1E2175183846ADFD7190EDECD4a` | [View](https://sepolia.basescan.org/address/0x523E3033F844B1E2175183846ADFD7190EDECD4a) |
+| ComplianceRegistry | `0x78383225EA842251361CE7104456322d4d151D66` | [View](https://sepolia.basescan.org/address/0x78383225EA842251361CE7104456322d4d151D66) |
+| DiligencePortal | `0xa5A29714cb9c51A10a165cBe2025372640abb9e5` | [View](https://sepolia.basescan.org/address/0xa5A29714cb9c51A10a165cBe2025372640abb9e5) |
+| RWAComplianceReceiver | `0x16b1D017F22F2aB47bA3eA1948ff973A024CCB4F` | [View](https://sepolia.basescan.org/address/0x16b1D017F22F2aB47bA3eA1948ff973A024CCB4F) |
+| RWAVault | `0x65054D2De227b7e823a0c13fc0C5D6c62198963d` | [View](https://sepolia.basescan.org/address/0x65054D2De227b7e823a0c13fc0C5D6c62198963d) |
 | IdentityRegistry | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | [View](https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) |
 | ReputationRegistry | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | [View](https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713) |
-| ValidationRegistry | `0x7ba22271A22D84807C501bCb6deeF76966262BE6` | [View](https://sepolia.basescan.org/address/0x7ba22271A22D84807C501bCb6deeF76966262BE6) |
+| ValidationRegistry | `0xa30004dfA091b5bD9B019Fa31b490847929555EC` | [View](https://sepolia.basescan.org/address/0xa30004dfA091b5bD9B019Fa31b490847929555EC) |
 
 > **IdentityRegistry and ReputationRegistry are the official ERC-8004 registries** deployed by the 8004 team, shared across all projects on the chain.
 
@@ -23,12 +23,12 @@ This flow runs the full protocol on **real Base Sepolia** using CRE staging simu
 
 | Agent | ID | Name | 8004scan |
 |---|---|---|---|
-| Reputation Agent | `#879` | RWA Diligence Reputation Agent | [View](https://testnet.8004scan.io/agents/base-sepolia/879) |
-| Validation Agent | `#880` | RWA Diligence Validation Agent | [View](https://testnet.8004scan.io/agents/base-sepolia/880) |
+| Reputation Agent | `#916` | RWA Diligence Reputation Agent | [View](https://8004scan.vercel.app) |
+| Validation Agent | `#917` | RWA Diligence Validation Agent | [View](https://8004scan.vercel.app) |
 
-Agent registrar address: `0x4e767bE56A8e70759544831e6e1825c94f945cE3`
+**EAS Schema UID:** `0x91f39675fa85b9340ba36983e388a4b9238c55ac7f593f2c87ba0c55115dd06a`
 
-> Browse all agents: https://testnet.8004scan.io/agents
+> Browse all agents: https://8004scan.vercel.app
 
 ---
 
@@ -37,7 +37,6 @@ Agent registrar address: `0x4e767bE56A8e70759544831e6e1825c94f945cE3`
 | Role | Address | Notes |
 |---|---|---|
 | **Deployer / Owner** | `0x28ea4eF61ac4cca3ed6a64dBb5b2D4be1aDC9814` | Derived from deployer key |
-| **Agent Registrar** | `0x4e767bE56A8e70759544831e6e1825c94f945cE3` | Derived from `keccak256("RWA_AGENT_REGISTRAR_PRIVATE_KEY_V1")` |
 | **x402 Buyer** | `0x28ea4eF61ac4cca3ed6a64dBb5b2D4be1aDC9814` | Same as deployer (clean EOA, no EIP-7702 code) |
 
 > Keep private keys only in local `.env` files and never commit them.
@@ -49,10 +48,12 @@ Agent registrar address: `0x4e767bE56A8e70759544831e6e1825c94f945cE3`
 - `cre` CLI + `bun`
 - Node.js 18+
 - Real Base Sepolia ETH in deployer wallet (get from [Base Sepolia Faucet](https://www.coinbase.com/faucets/base-ethereum-goerli-faucet))
-- Sumsub sandbox keys (or `FORCE_APPROVE=true`)
-- Gemini API key
+- Sumsub sandbox keys (or `FORCE_APPROVE=true`) — see [Sumsub Setup](sumsub-setup.md)
+- Gemini API key (free from [aistudio.google.com](https://aistudio.google.com))
 
 ## 1) Deploy contracts to Base Sepolia
+
+> **Skip this step if using the already-deployed contracts above.**
 
 ```bash
 export RPC_URL=https://sepolia.base.org
@@ -71,63 +72,31 @@ forge script script/Deploy.s.sol:Deploy \
 
 ## 2) Configure environment files
 
-### `cre/chainlink-Convergence/.env`
+Copy `.example` files and fill in secrets:
+
 ```bash
-CRE_ETH_PRIVATE_KEY=<DEPLOYER_PRIVATE_KEY>
-CRE_TARGET=staging-settings
-GEMINI_API_KEY=<your_gemini_api_key>
-X402_BUYER_PRIVATE_KEY=<X402_BUYER_PRIVATE_KEY>
-X402_BUYER_ADDRESS=<X402_BUYER_WALLET_ADDRESS>
-X402_PAY_TO=<X402_RECIPIENT_ADDRESS>
+cp .env.example .env
+cp services/kyb-provider/.env.example services/kyb-provider/.env
+cp cre/chainlink-Convergence/.env.example cre/chainlink-Convergence/.env
+cp cre/chainlink-Convergence/my-workflow/config.staging.example.json \
+   cre/chainlink-Convergence/my-workflow/config.staging.json
+cp app/.env.local.example app/.env.local
 ```
 
-### `cre/chainlink-Convergence/my-workflow/config.staging.json`
-```json
-{
-  "chainSelectorName": "ethereum-testnet-sepolia-base-1",
-  "diligencePortalAddress": "0x337c75270D09A8D8BFCe386F93715E230b39E48c",
-  "receiverAddress": "0x7cbFd330F61723c215c5061eD3b1A75CCCbF4e42",
-  "gasLimit": "1000000",
-  "kybUrl": "http://127.0.0.1:3001/kyb",
-  "documentResolverUrl": "http://127.0.0.1:3001/docs/resolve",
-  "geminiModel": "gemini-2.5-flash",
-  "geminiApiKey": "<your_gemini_api_key>",
-  "x402BuyerPrivateKey": "",
-  "useConfidentialHttp": false,
-  "x402Enabled": true
-}
-```
+Fill in your API keys and private keys in each file. The `.example` files already contain testnet contract addresses — you only need to add secrets.
 
-### `services/kyb-provider/.env`
-```bash
-PORT=3001
-FORCE_APPROVE=true               # Set false for real Sumsub flow
-X402_ENABLED=true
-X402_NETWORK=base-sepolia
-X402_PAY_TO=<X402_RECIPIENT_ADDRESS>
-KYB_PRICE=0.01
-X402_TIMEOUT_SECONDS=600
-X402_RELAYER_PRIVATE_KEY=<X402_RELAYER_PRIVATE_KEY>
-X402_RPC_URL=https://sepolia.base.org
-X402_EIP712_NAME=USDC
-X402_EIP712_VERSION=2
-SUMSUB_BASE_URL=https://api.sumsub.com
-SUMSUB_APP_TOKEN=<your_sumsub_app_token>
-SUMSUB_SECRET_KEY=<your_sumsub_secret_key>
-SUMSUB_LEVEL_NAME=id-and-liveness
-```
+### Key secrets to fill
 
-### `app/.env.local`
-```bash
-NEXT_PUBLIC_NETWORK=testnet
-DEPLOYER_PRIVATE_KEY=<DEPLOYER_PRIVATE_KEY>
-RPC_URL=https://sepolia.base.org
-```
+| File | Secrets |
+|---|---|
+| `.env` | `GEMINI_API_KEY` |
+| `services/kyb-provider/.env` | `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY`, `X402_PAY_TO`, `X402_RPC_URL`, `X402_RELAYER_PRIVATE_KEY` |
+| `cre/chainlink-Convergence/.env` | `CRE_ETH_PRIVATE_KEY`, `GEMINI_API_KEY`, `X402_BUYER_PRIVATE_KEY` |
+| `app/.env.local` | `DEPLOYER_PRIVATE_KEY`, `RPC_URL` |
 
-## 3) Update contract addresses in frontend
+## 3) Update contract addresses (only if you redeployed)
 
-If you redeploy, update the `TESTNET_ADDRESSES` in `app/src/lib/addresses.ts` to match
-the new deployment, or use the auto-sync tool:
+If you redeployed, update the CRE config and frontend addresses:
 
 ```bash
 node tools/sync-cre-config.mjs --chain-id 84532 --config cre/chainlink-Convergence/my-workflow/config.staging.json
@@ -145,33 +114,49 @@ Verify:
 curl -s http://127.0.0.1:3001/kyb -X POST -H 'content-type: application/json' -d '{}' | jq '.accepts[0].payTo'
 ```
 
-## 5) Submit a diligence request on-chain
+## 5) Upload document bundle to IPFS and submit request
+
+### Prepare the bundle
+
+Edit `docs/acme-company-bundle.upload.json` with your company details and document hashes.
+
+### Upload to IPFS
+
+Use any pinning provider. Example with Pinata:
+1. Open [Pinata](https://app.pinata.cloud) and sign in
+2. Upload your company bundle JSON file
+3. Copy the returned CID
+
+### Compute `docBundleHash` and submit
 
 ```bash
 export RPC_URL=https://sepolia.base.org
 export PRIVATE_KEY=<DEPLOYER_PRIVATE_KEY>
-export PORTAL_ADDRESS=0x337c75270D09A8D8BFCe386F93715E230b39E48c
+export PORTAL_ADDRESS=0xa5A29714cb9c51A10a165cBe2025372640abb9e5
 export SUBJECT=0x28ea4eF61ac4cca3ed6a64dBb5b2D4be1aDC9814
-node tools/hash-doc-bundle.mjs --uri ipfs://<CID>/<path-to-doc-bundle.json>
+export METADATA_URI=ipfs://<CID>/<filename>.json
+
+# Compute the hash
+node tools/hash-doc-bundle.mjs --uri "$METADATA_URI"
 export DOC_BUNDLE_HASH=<hash_from_tool_output>
-export METADATA_URI=ipfs://<CID>/<path-to-doc-bundle.json>
 
 forge script script/SubmitRequest.s.sol:SubmitRequest \
   --rpc-url "$RPC_URL" \
   --broadcast
 ```
 
+### What is persisted on-chain
+
+- In `DiligencePortal` request: `subject`, `docBundleHash`, `metadataUri`
+- In `ComplianceRegistry` record: `approved`, `riskScore`, `attestationHash`, `updatedAt`
+- Full document contents remain off-chain (IPFS)
+
 ## 6) Run CRE workflow simulation (staging target)
 
 ```bash
 cd cre/chainlink-Convergence
 
-# Build the HTTP payload
-cat > ../../http-payload.local.json <<'EOF'
-{ "requestId": 1 }
-EOF
-
-PAYLOAD=$(jq -c . ../../http-payload.local.json)
+PAYLOAD='{"requestId":1}'
 
 cre workflow simulate ./my-workflow \
   --target staging-settings \
@@ -182,7 +167,7 @@ cre workflow simulate ./my-workflow \
 ```
 
 Expected output includes:
-- document resolver verification (`sourceHash`) + deterministic extraction (`extractionHash`)
+- Document resolver verification (`sourceHash`) + deterministic extraction (`extractionHash`)
 - KYB check via x402 paywall → APPROVED (if `FORCE_APPROVE=true`)
 - Gemini LLM risk analysis → risk score
 - On-chain write to ComplianceRegistry via RWAComplianceReceiver
@@ -191,7 +176,7 @@ Expected output includes:
 ## 7) Verify on-chain outcome
 
 ```bash
-REGISTRY=0x590552A4d4eF77F3AbD25C76fA8f304f2388b9e5
+REGISTRY=0x78383225EA842251361CE7104456322d4d151D66
 SUBJECT=0x28ea4eF61ac4cca3ed6a64dBb5b2D4be1aDC9814
 
 cast call $REGISTRY "isApproved(address)(bool)" $SUBJECT --rpc-url https://sepolia.base.org
@@ -217,9 +202,9 @@ Key pages:
 
 ## 9) Check ERC-8004 agents on 8004scan
 
-- All agents: https://testnet.8004scan.io/agents
-- Agent #879 (Reputation): https://testnet.8004scan.io/agents/base-sepolia/879
-- Agent #880 (Validation): https://testnet.8004scan.io/agents/base-sepolia/880
+- All agents: https://8004scan.vercel.app
+- Agent #916 (Reputation): https://8004scan.vercel.app
+- Agent #917 (Validation): https://8004scan.vercel.app
 
 ---
 
@@ -227,12 +212,11 @@ Key pages:
 
 | What | Link |
 |---|---|
-| ComplianceRegistry | https://sepolia.basescan.org/address/0x590552A4d4eF77F3AbD25C76fA8f304f2388b9e5 |
+| ComplianceRegistry | https://sepolia.basescan.org/address/0x78383225EA842251361CE7104456322d4d151D66 |
 | IdentityRegistry (official) | https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e |
 | ReputationRegistry (official) | https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713 |
-| ValidationRegistry | https://sepolia.basescan.org/address/0x7ba22271A22D84807C501bCb6deeF76966262BE6 |
-| Agent #879 (8004scan) | https://testnet.8004scan.io/agents/base-sepolia/879 |
-| Agent #880 (8004scan) | https://testnet.8004scan.io/agents/base-sepolia/880 |
+| ValidationRegistry | https://sepolia.basescan.org/address/0xa30004dfA091b5bD9B019Fa31b490847929555EC |
+| 8004scan | https://8004scan.vercel.app |
 
 ---
 

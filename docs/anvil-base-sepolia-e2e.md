@@ -147,10 +147,10 @@ cd app && node scripts/sync-abis.mjs
 ## 6) Submit diligence request
 ```bash
 
-# Build or fetch your real document bundle first, then compute its hash:
-node tools/hash-doc-bundle.mjs --file ./docs/acme-doc-bundle.example.json
+# Compute the document bundle hash from an IPFS URI or local file:
+node tools/hash-doc-bundle.mjs --file ./docs/acme-company-bundle.upload.json
 # OR for already uploaded IPFS content:
-# node tools/hash-doc-bundle.mjs --uri ipfs://<CID>/<path>
+# node tools/hash-doc-bundle.mjs --uri ipfs://<CID>/<filename>.json
 
 export PORTAL_ADDRESS=$(jq -r '[.transactions[] | select(.contractName=="DiligencePortal")][0].contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
 export SUBJECT=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
