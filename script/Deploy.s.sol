@@ -156,8 +156,8 @@ contract Deploy is Script {
         }
 
         if (address(out.reputationRegistry) != address(0)) {
-            // valueDecimals=1: raw value -500..+1000 maps to -50..+100 on 8004scan (e.g. 850 → 85/100)
-            out.receiver.setERC8004Reputation(address(out.reputationRegistry), out.reputationAgentId, 1);
+            // valueDecimals=0: raw value directly in -50..+100 range for 8004scan compatibility
+            out.receiver.setERC8004Reputation(address(out.reputationRegistry), out.reputationAgentId, 0);
         }
 
         if (address(out.validationRegistry) != address(0)) {
