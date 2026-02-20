@@ -1,0 +1,14 @@
+{
+  "chainSelectorName": "ethereum-testnet-sepolia-base-1",
+  "diligencePortalAddress": "0xa5A29714cb9c51A10a165cBe2025372640abb9e5",
+  "receiverAddress": "0x16b1D017F22F2aB47bA3eA1948ff973A024CCB4F",
+  "gasLimit": "1000000",
+  "kybUrl": "https://YOUR_PUBLIC_KYB_SERVICE/kyb",
+  "documentResolverUrl": "https://YOUR_PUBLIC_KYB_SERVICE/docs/resolve",
+  "geminiModel": "gemini-2.5-flash",
+  "geminiApiKey": "",
+  "x402BuyerPrivateKey": "",
+  "useConfidentialHttp": true,
+  "x402Enabled": true,
+  "docResolverApiKey": ""
+}

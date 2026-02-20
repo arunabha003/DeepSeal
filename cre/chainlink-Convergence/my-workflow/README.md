@@ -14,13 +14,31 @@ This workflow processes an onchain diligence request stored in `DiligencePortal`
 `../project.yaml` contains RPCs used by local simulation. Default is a public Sepolia RPC.
 
 ## 2) Configure secrets
-Create `../.env` from `../.env.example` and set:
-- `CRE_ETH_PRIVATE_KEY` (funded on Sepolia if you broadcast)
+Use the env file at `cre/chainlink-Convergence/.env` (not the repository root `.env`).
+
+```bash
+cd /Users/arunabha003/Documents/Projects/Chainlink-Converegence
+cp cre/chainlink-Convergence/.env.example cre/chainlink-Convergence/.env
+```
+
+Set in `cre/chainlink-Convergence/.env`:
+- `CRE_ETH_PRIVATE_KEY` (funded on target chain if you broadcast)
 - `GEMINI_API_KEY`
 - `X402_BUYER_PRIVATE_KEY` (required when `x402Enabled=true`)
 
+Other env files are separate:
+- `services/kyb-provider/.env` → Sumsub + x402 seller/provider settings
+- `app/.env.local` → frontend/server env
+
 ## 3) Configure workflow
-Pick one config file:
+Copy examples to local config files first:
+```bash
+cp config.anvil-e2e.example.json config.anvil-e2e.json
+cp config.staging.example.json config.staging.json
+cp config.production.example.json config.production.json
+```
+
+Then pick one local config file:
 - `config.anvil-e2e.json` → Anvil/fork e2e, free KYB path (`/kyb/free`), `x402Enabled=false`
 - `config.staging.json` / `config.production.json` → Base Sepolia paid KYB path (`/kyb`), `x402Enabled=true`
 
@@ -29,18 +47,20 @@ Then edit the selected file:
 - `receiverAddress` (deployed `RWAComplianceReceiver`)
 - `kybUrl` (local provider route)
 - `documentResolverUrl` (local resolver route, usually `http://127.0.0.1:3001/docs/resolve`)
- - Optional:
-   - `useConfidentialHttp` (explicit Confidential HTTP client)
-   - `x402Enabled` (should match whether KYB is paywalled on `POST /kyb`)
-   - `geminiApiKey` / `x402BuyerPrivateKey` (local simulation fallback when CRE secrets are not linked)
-   - `docResolverApiKey` (optional shared key for resolver endpoint)
+- Optional:
+  - `useConfidentialHttp` (explicit Confidential HTTP client)
+  - `x402Enabled` (should match whether KYB is paywalled on `POST /kyb`)
+  - `geminiApiKey` / `x402BuyerPrivateKey` (local simulation fallback when CRE secrets are not linked)
+  - `docResolverApiKey` (optional shared key for resolver endpoint)
+
+The real config files are gitignored and intended to be per-user/per-environment.
 
 ## x402 + Confidential HTTP
 - x402 buyer retries are implemented for both HTTP client paths.
 - For paid mode, set:
   - workflow `kybUrl` to `/kyb`
- - `x402Enabled=true`
- - `X402_BUYER_PRIVATE_KEY` in CRE secret manager or config fallback
+  - `x402Enabled=true`
+  - `X402_BUYER_PRIVATE_KEY` in CRE secret manager or config fallback
   - Local fallback helper:
     - `node ../../tools/sync-local-secrets-to-config.mjs --config ./config.anvil-e2e.json`
     - `node ../../tools/sync-local-secrets-to-config.mjs --config ./config.staging.json`
