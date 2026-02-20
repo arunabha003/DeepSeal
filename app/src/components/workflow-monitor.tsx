@@ -430,6 +430,49 @@ export function WorkflowMonitor({
                   {/* Gemini data card */}
                   {step?.data && p.id === "gemini" && (
                     <div className="mt-2 space-y-2">
+                      {/* What Gemini analyzed */}
+                      {Boolean(step.data.analyzedCompany || step.data.kybInputStatus) && (
+                        <div className="p-2.5 rounded bg-accent/5 border border-accent/20 text-[11px]">
+                          <span className="text-[10px] font-semibold uppercase tracking-widest text-accent mb-1.5 block">
+                            Gemini Input Context
+                          </span>
+                          <div className="grid grid-cols-2 gap-2">
+                            {Boolean(step.data.analyzedCompany) && (
+                              <div>
+                                <span className="text-muted block">Company</span>
+                                <span className="font-mono text-white">{String(step.data.analyzedCompany)}</span>
+                              </div>
+                            )}
+                            {Boolean(step.data.analyzedCountry) && (
+                              <div>
+                                <span className="text-muted block">Country</span>
+                                <span className="font-mono text-white">{String(step.data.analyzedCountry)}</span>
+                              </div>
+                            )}
+                            {Boolean(step.data.analyzedRegNumber) && (
+                              <div>
+                                <span className="text-muted block">Reg. Number</span>
+                                <span className="font-mono text-white">{String(step.data.analyzedRegNumber)}</span>
+                              </div>
+                            )}
+                            {Boolean(step.data.kybInputStatus) && (
+                              <div>
+                                <span className="text-muted block">KYB Status (input)</span>
+                                <span className={cn("font-mono font-bold", String(step.data.kybInputStatus) === "APPROVED" ? "text-success" : "text-danger")}>
+                                  {String(step.data.kybInputStatus)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {Boolean(step.data.documentSourceHash) && (
+                            <div className="mt-1.5">
+                              <span className="text-muted block">Doc Source Hash</span>
+                              <span className="font-mono text-zinc-500 break-all text-[10px]">{String(step.data.documentSourceHash)}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {/* Gemini verdict */}
                       <div className="p-2.5 rounded bg-surface-2/50 border border-surface-3/50 grid grid-cols-2 gap-3 text-[11px]">
                         <div>
                           <span className="text-muted block">Gemini Says</span>
@@ -552,23 +595,117 @@ export function WorkflowMonitor({
 
                   {/* Side effects data card */}
                   {step?.data && p.id === "side-effects" && (
-                    <div className="mt-2 p-2.5 rounded bg-surface-2/50 border border-surface-3/50 text-[11px]">
-                      <span className="text-muted block mb-1">
-                        Events Emitted
-                      </span>
-                      <ul className="space-y-0.5">
-                        {(
-                          (step.data.events as string[]) || []
-                        ).map((e, i) => (
-                          <li
-                            key={i}
-                            className="text-zinc-400 font-mono flex gap-1.5"
-                          >
-                            <span className="text-success/60">●</span>
-                            {e}
-                          </li>
-                        ))}
-                      </ul>
+                    <div className="mt-2 space-y-2">
+                      {/* ERC-8004 Agent Scores */}
+                      {Array.isArray(step.data.erc8004Agents) && (step.data.erc8004Agents as { agentId: number; value: number; decimals: number; display: string }[]).length > 0 && (
+                        <div className="p-2.5 rounded bg-accent/5 border border-accent/20 text-[11px]">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-[10px] font-semibold uppercase tracking-widest text-accent">
+                              ERC-8004 Agent Scores
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-mono">
+                              ✓ on-chain
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {(step.data.erc8004Agents as { agentId: number; value: number; decimals: number; display: string }[]).map((agent, i) => (
+                              <div key={i} className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <a
+                                    href={`https://testnet.8004scan.io/agents/base-sepolia/${agent.agentId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-mono text-accent hover:underline inline-flex items-center gap-0.5"
+                                  >
+                                    Agent #{agent.agentId}
+                                    <span className="text-[9px]">↗</span>
+                                  </a>
+                                  <span className="text-muted">
+                                    {i === 0 ? "(Reputation)" : "(Validation)"}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-24 h-2 rounded-full bg-surface-3 overflow-hidden">
+                                    <div
+                                      className={cn(
+                                        "h-full rounded-full transition-all",
+                                        Number(agent.display) >= 70 ? "bg-success" : Number(agent.display) >= 40 ? "bg-warning" : "bg-danger"
+                                      )}
+                                      style={{ width: `${Math.max(0, Math.min(100, Number(agent.display)))}%` }}
+                                    />
+                                  </div>
+                                  <span className={cn(
+                                    "font-mono font-bold text-xs min-w-[3rem] text-right",
+                                    Number(agent.display) >= 70 ? "text-success" : Number(agent.display) >= 40 ? "text-warning" : "text-danger"
+                                  )}>
+                                    {agent.display}/100
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {/* EAS Attestation */}
+                      {Boolean(step.data.easAttestationUid) && (
+                        <div className="p-2.5 rounded bg-success/5 border border-success/20 text-[11px]">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-widest text-success">
+                              EAS Attestation
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/20 text-success font-mono">
+                              ✓ on-chain
+                            </span>
+                          </div>
+                          <div className="space-y-1">
+                            <div>
+                              <span className="text-muted block">Attestation UID</span>
+                              <a
+                                href={`https://base-sepolia.easscan.org/attestation/view/${String(step.data.easAttestationUid)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-mono text-accent hover:underline break-all inline-flex items-center gap-1 text-[10px]"
+                              >
+                                {String(step.data.easAttestationUid)}
+                                <span className="text-[9px]">↗</span>
+                              </a>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 mt-1">
+                              <div>
+                                <span className="text-muted block">Contract</span>
+                                <span className="font-mono text-zinc-400">0x4200...0021</span>
+                              </div>
+                              <div>
+                                <span className="text-muted block">Schema Registry</span>
+                                <span className="font-mono text-zinc-400">0x4200...0020</span>
+                              </div>
+                              <div>
+                                <span className="text-muted block">Revocable</span>
+                                <span className="font-mono text-success">Yes</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {/* Event list */}
+                      <div className="p-2.5 rounded bg-surface-2/50 border border-surface-3/50 text-[11px]">
+                        <span className="text-muted block mb-1">
+                          Events Emitted
+                        </span>
+                        <ul className="space-y-0.5">
+                          {(
+                            (step.data.events as string[]) || []
+                          ).map((e, i) => (
+                            <li
+                              key={i}
+                              className="text-zinc-400 font-mono flex gap-1.5"
+                            >
+                              <span className="text-success/60">●</span>
+                              {e}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -623,6 +760,25 @@ export function WorkflowMonitor({
                 {String(simResult.reportHash || simResult.attestationHash || "").slice(0, 14)}...
               </span>
             </div>
+          </div>
+          {/* Cryptographic provenance hashes */}
+          <div className="px-4 pb-2 grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+            {!!simResult.documentSourceHash && (
+              <div>
+                <span className="text-muted block mb-0.5">Document Source Hash</span>
+                <code className="font-mono text-zinc-500 break-all block text-[10px]">
+                  {String(simResult.documentSourceHash)}
+                </code>
+              </div>
+            )}
+            {!!simResult.extractionHash && (
+              <div>
+                <span className="text-muted block mb-0.5">Extraction Hash</span>
+                <code className="font-mono text-zinc-500 break-all block text-[10px]">
+                  {String(simResult.extractionHash)}
+                </code>
+              </div>
+            )}
           </div>
           {/* Full attestation hash for verification */}
           {!!(simResult.reportHash || simResult.attestationHash) && (

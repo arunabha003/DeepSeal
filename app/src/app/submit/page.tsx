@@ -25,9 +25,11 @@ export default function SubmitPage() {
   const { switchChainAsync, isPending: isSwitchingChain } = useSwitchChain();
 
   const [subject, setSubject] = useState(address || "");
-  const [metadataUri, setMetadataUri] = useState("ipfs://rwa-docs/acme");
+  const [metadataUri, setMetadataUri] = useState(
+    "https://silver-genuine-aardvark-194.mypinata.cloud/ipfs/bafkreihabnpymvxs54yibq6zak5q7xjrwjckr2exuedpzr4esqxeuvehhi"
+  );
   const [docBundleHash, setDocBundleHash] = useState(
-    "0x1111111111111111111111111111111111111111111111111111111111111111"
+    "0x023885a086cc9fd46bf6bf0a17c95058c1f266f8e9bf4b0684c0b140b8ad3ef6"
   );
 
   const { data: nextRequestId } = useReadContract({
@@ -113,9 +115,12 @@ export default function SubmitPage() {
               type="text"
               value={metadataUri}
               onChange={(e) => setMetadataUri(e.target.value)}
-              placeholder="ipfs://..."
+              placeholder="ipfs://... or https://..."
               className="w-full"
             />
+            <p className="text-[11px] text-muted mt-1">
+              Pre-filled: Acme Renewables Ltd company bundle on Pinata IPFS
+            </p>
           </div>
 
           <div>
@@ -134,6 +139,9 @@ export default function SubmitPage() {
                 Hash URI
               </Button>
             </div>
+            <p className="text-[11px] text-muted mt-1">
+              keccak256 of the raw document bytes — pre-filled for the Acme bundle
+            </p>
           </div>
 
           <div className="pt-2">

@@ -210,6 +210,11 @@ export async function POST(req: NextRequest) {
           let resultJson: Record<string, unknown> | null = null;
           let buffer = "";
           let kybStarted = false;
+          let extractedCompanyInfo: Record<string, unknown> = {};
+          let documentSourceHash = "";
+          let documentExtractionHash = "";
+          let kybProviderStatus = "";
+          let kybProviderScore = 0;
 
           const processLine = (line: string) => {
             // Strip ANSI color codes
@@ -265,6 +270,8 @@ export async function POST(req: NextRequest) {
               const sourceHashMatch = trimmed.match(/sourceHash=(0x[0-9a-fA-F]+)/);
               const extractionHashMatch = trimmed.match(/extractionHash=(0x[0-9a-fA-F]+)/);
               const resolvedUrlMatch = trimmed.match(/resolvedUrl=(\S+)/);
+              documentSourceHash = sourceHashMatch?.[1] || "";
+              documentExtractionHash = extractionHashMatch?.[1] || "";
               send("step", {
                 id: "doc-resolve",
                 status: "complete",
@@ -297,12 +304,17 @@ export async function POST(req: NextRequest) {
                   extracted = {};
                 }
               }
+              extractedCompanyInfo = extracted;
               send("step", {
                 id: "doc-resolve",
                 status: "complete",
                 label: "Resolving + Verifying Document Bundle",
                 detail: `Extraction complete: ${String(extracted.companyName || "company")} (${String(extracted.country || "country")})`,
-                data: extracted,
+                data: {
+                  ...extracted,
+                  sourceHash: documentSourceHash,
+                  extractionHash: documentExtractionHash,
+                },
               });
               if (!kybStarted) {
                 kybStarted = true;
@@ -320,6 +332,8 @@ export async function POST(req: NextRequest) {
               const scoreMatch = trimmed.match(/providerScore=(\d+)/);
               const kybStatus = statusMatch?.[1] || "UNKNOWN";
               const kybScore = scoreMatch?.[1] || "?";
+              kybProviderStatus = kybStatus;
+              kybProviderScore = Number(kybScore);
               send("step", {
                 id: "kyb",
                 status: "complete",
@@ -368,6 +382,14 @@ export async function POST(req: NextRequest) {
                   geminiApproved: approvedMatch?.[1] === "true",
                   geminiRiskScore: Number(scoreMatch?.[1]),
                   reasons,
+                  // Context: what Gemini analyzed
+                  analyzedCompany: extractedCompanyInfo.companyName || null,
+                  analyzedCountry: extractedCompanyInfo.country || null,
+                  analyzedRegNumber: extractedCompanyInfo.registrationNumber || null,
+                  kybInputStatus: kybProviderStatus,
+                  kybInputScore: kybProviderScore,
+                  documentSourceHash: documentSourceHash || null,
+                  extractionHash: documentExtractionHash || null,
                 },
               });
             }
@@ -398,7 +420,7 @@ export async function POST(req: NextRequest) {
                 id: "write-report",
                 status: "complete",
                 label: "Writing Report On-Chain",
-                detail: "CRE simulator report write complete (local mode)",
+                detail: `CRE simulator report write complete (${IS_LOCAL ? "local" : "testnet"} mode)`,
               });
             }
 
@@ -588,26 +610,52 @@ export async function POST(req: NextRequest) {
           });
 
           if (success && receipt.logs.length > 0) {
-            // Parse known events from logs
-            const eventSignatures: Record<string, string> = {
-              // ComplianceUpdated(address,bool,uint32,bytes32,uint64)
-              "0x6b7b4d0c": "ComplianceRegistry.ComplianceUpdated",
-              // ReportProcessed(address,bool,uint32,bytes32)
-              "0xa8fb6a61": "RWAComplianceReceiver.ReportProcessed",
-              // ERC8004ReputationWritten
-              "0x": "ERC-8004 Reputation Written",
-              // ERC8004ValidationRequested
-              "0x1": "ERC-8004 Validation Requested",
-            };
+            // Parse known events from logs by topic0 hash
+            const COMPLIANCE_UPDATED = "0x91006496d86cec2237517a88b4cc35da2281f10bab7037db6da92c3c2c2d3354";
+            const REPORT_PROCESSED = "0xe0836c97c57c16c6792d2845db7500913c388ca47ea613468c8e1682cf57a9c9";
+            const REPUTATION_WRITTEN = "0x47cbc21d242643bf95c17cd475baf8d9c4a57ca1d2e4d501daa7bb553fe9b5b0";
+            const FEEDBACK_GIVEN = "0x6a4a61743519c9d648a14e6493f47dbe3ff1aa29e7785c96c8326a205e58febc";
+            const EAS_ATTESTED = "0xe5000e8d007541a20bb85e4d344e4d4a495f6945d469389b23d4d00fa684b9aa";
+            const EAS_ATTEST_FAILED = "0x6ee9a79d936fb15d44457ed75a9f5c768372aecf024ee83f5937d3df0d8e90d8";
 
             const sideEffects: string[] = [];
+            const erc8004Agents: { agentId: number; value: number; decimals: number; display: string }[] = [];
+            let easAttestationUid: string | null = null;
+
             for (const log of receipt.logs) {
-              const sig = log.topics[0]?.slice(0, 10) || "";
-              // Identify known events by topic hash prefixes
-              if (log.topics[0]) {
-                sideEffects.push(
-                  `Event from ${log.address.slice(0, 10)}... topic=${log.topics[0].slice(0, 18)}...`
-                );
+              const topic0 = log.topics[0] || "";
+              if (topic0 === COMPLIANCE_UPDATED) {
+                sideEffects.push("✓ ComplianceRegistry.ComplianceUpdated");
+              } else if (topic0 === REPORT_PROCESSED) {
+                sideEffects.push("✓ RWAComplianceReceiver.ReportProcessed");
+              } else if (topic0 === REPUTATION_WRITTEN) {
+                // Decode ERC8004ReputationWritten(uint256 agentId, int128 value, uint8 decimals, bytes32 feedbackHash)
+                const agentId = Number(BigInt(log.topics[1] || "0"));
+                try {
+                  const data = log.data as Hex;
+                  // data layout: int128 value (32 bytes) + uint8 decimals (32 bytes) + bytes32 hash (32 bytes)
+                  const rawValue = BigInt("0x" + data.slice(2, 66));
+                  // Handle int128: if high bit set, it's negative
+                  const value = rawValue > BigInt("0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
+                    ? Number(rawValue - BigInt("0x100000000000000000000000000000000"))
+                    : Number(rawValue);
+                  const decimals = Number(BigInt("0x" + data.slice(66, 130)));
+                  const display = (value / Math.pow(10, decimals)).toFixed(decimals);
+                  erc8004Agents.push({ agentId, value, decimals, display });
+                  sideEffects.push(`✓ ERC-8004 Agent #${agentId} reputation: ${display}/100`);
+                } catch {
+                  sideEffects.push(`✓ ERC-8004 Agent #${agentId} reputation written`);
+                }
+              } else if (topic0 === FEEDBACK_GIVEN) {
+                // ReputationRegistry.FeedbackGiven - already covered by ReputationWritten
+              } else if (topic0 === EAS_ATTESTED) {
+                // EASAttested(address indexed subject, bytes32 indexed uid)
+                easAttestationUid = log.topics[2] || null;
+                sideEffects.push(`✓ EAS Attestation created: ${(easAttestationUid || "").slice(0, 14)}...`);
+              } else if (topic0 === EAS_ATTEST_FAILED) {
+                sideEffects.push(`✗ EAS Attestation failed`);
+              } else if (log.topics[0]) {
+                sideEffects.push(`Event from ${log.address.slice(0, 10)}...`);
               }
             }
 
@@ -615,10 +663,12 @@ export async function POST(req: NextRequest) {
               id: "side-effects",
               status: "complete",
               label: "On-Chain Side Effects",
-              detail: `${receipt.logs.length} events emitted`,
+              detail: `${receipt.logs.length} events emitted · ${erc8004Agents.length} ERC-8004 agent scores written${easAttestationUid ? " · EAS attested" : ""}`,
               data: {
                 events: sideEffects,
                 logsCount: receipt.logs.length,
+                erc8004Agents,
+                easAttestationUid,
               },
             });
           }

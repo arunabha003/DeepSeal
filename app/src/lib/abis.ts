@@ -536,6 +536,27 @@ export const RWAComplianceReceiverABI = [
     stateMutability: "view",
   },
   {
+    type: "function",
+    name: "eas",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "easSchemaUid",
+    inputs: [],
+    outputs: [{ name: "", type: "bytes32" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "reputationValueDecimals",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+    stateMutability: "view",
+  },
+  {
     type: "event",
     name: "ReportProcessed",
     inputs: [
@@ -543,6 +564,14 @@ export const RWAComplianceReceiverABI = [
       { name: "approved", type: "bool", indexed: false },
       { name: "riskScore", type: "uint32", indexed: false },
       { name: "attestationHash", type: "bytes32", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "EASAttested",
+    inputs: [
+      { name: "subject", type: "address", indexed: true },
+      { name: "uid", type: "bytes32", indexed: true },
     ],
   },
 ] as const;

@@ -16,7 +16,7 @@ export const IS_TESTNET = NETWORK === "testnet";
 
 export const RPC_URLS: Record<NetworkMode, string> = {
   local: "http://127.0.0.1:8545",
-  testnet: "https://sepolia.base.org",
+  testnet: process.env.NEXT_PUBLIC_RPC_URL || "https://base-sepolia.g.alchemy.com/v2/xiJw6cj_7U8PXLSncrSON78PWDXP4Dkl",
 };
 
 export const RPC_URL = RPC_URLS[NETWORK];

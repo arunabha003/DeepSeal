@@ -140,11 +140,30 @@ function BrowseAgents() {
         abi: RWAComplianceReceiverABI,
         functionName: "validationAgentId",
       },
+      {
+        address: RECV,
+        abi: RWAComplianceReceiverABI,
+        functionName: "eas",
+      },
+      {
+        address: RECV,
+        abi: RWAComplianceReceiverABI,
+        functionName: "easSchemaUid",
+      },
+      {
+        address: RECV,
+        abi: RWAComplianceReceiverABI,
+        functionName: "reputationValueDecimals",
+      },
     ],
   });
 
   const repAgentId = recvData?.[0]?.result as bigint | undefined;
   const valAgentId = recvData?.[1]?.result as bigint | undefined;
+  const easAddress = recvData?.[2]?.result as string | undefined;
+  const easSchemaUid = recvData?.[3]?.result as string | undefined;
+  const repDecimals = recvData?.[4]?.result as number | undefined;
+  const easEnabled = easAddress && easAddress !== "0x0000000000000000000000000000000000000000";
   const count = Number(nextId ?? 1) - 1;
 
   const trackedAgentIds = useMemo(() => {
@@ -217,6 +236,37 @@ function BrowseAgents() {
         )}
       </div>
 
+      {/* EAS & Config bar */}
+      <div className="bg-surface-1 border border-surface-3 rounded-lg p-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px]">
+        <div>
+          <span className="text-muted block mb-0.5">EAS Attestation</span>
+          {easEnabled ? (
+            <a
+              href={`https://base-sepolia.easscan.org/schema/view/${String(easSchemaUid)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-success hover:underline inline-flex items-center gap-1"
+            >
+              ✓ Enabled <span className="text-[9px]">↗</span>
+            </a>
+          ) : (
+            <span className="font-mono text-zinc-500">Not configured</span>
+          )}
+        </div>
+        <div>
+          <span className="text-muted block mb-0.5">EAS Contract</span>
+          <span className="font-mono text-zinc-400">{easEnabled ? "0x4200...0021" : "—"}</span>
+        </div>
+        <div>
+          <span className="text-muted block mb-0.5">Rep. Decimals</span>
+          <span className="font-mono text-zinc-400">{repDecimals !== undefined ? repDecimals.toString() : "—"}</span>
+        </div>
+        <div>
+          <span className="text-muted block mb-0.5">Score Range</span>
+          <span className="font-mono text-zinc-400">{repDecimals !== undefined ? (repDecimals === 0 ? "-50 to +100" : "-50.0 to +100.0") : "—"}</span>
+        </div>
+      </div>
+
       {!usingOfficial8004 && (
         <div className="text-[11px] text-muted bg-surface-1 border border-surface-3 rounded-lg p-2">
           8004scan tracks official ERC-8004 registries. Current Identity/Reputation
@@ -281,12 +331,12 @@ function AgentRow({
     ],
   });
 
-  /* Reputation reads - getSummary across all clients */
+  /* Reputation reads - getSummary for this agent from receiver client */
   const { data: repSummary } = useReadContract({
     address: REP,
     abi: ReputationRegistryABI,
     functionName: "getSummary",
-    args: [agentId, [], "", ""],
+    args: [agentId, [RECV], "", ""],
     query: { refetchInterval: 8_000 },
   });
 
