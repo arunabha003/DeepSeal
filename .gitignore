@@ -17,6 +17,9 @@ cre/**/my-workflow/test-out.*
 cre/**/my-workflow/cfg.json
 cre/chainlink-Convergence/.env
 services/kyb-provider/.env
+cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json
+cre/chainlink-Convergence/my-workflow/config.staging.json
+cre/chainlink-Convergence/my-workflow/config.production.json
 cre/chainlink-Convergence/my-workflow/config.*.local.json
 cre/chainlink-Convergence/my-workflow/config.*.private.json
 cre/chainlink-Convergence/my-workflow/config.*.secrets.json
