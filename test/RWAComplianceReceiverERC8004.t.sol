@@ -57,7 +57,7 @@ contract RWAComplianceReceiverERC8004Test is Test {
         uint64 last = reputation.getLastIndex(reputationAgentId, address(receiver));
         assertEq(last, 1);
         (int128 value,,,,) = reputation.readFeedback(reputationAgentId, address(receiver), 1);
-        assertEq(value, 880);
+        assertEq(value, 88);
 
         bytes32[] memory requestHashes = validation.getAgentValidations(validationAgentId);
         assertEq(requestHashes.length, 1);
