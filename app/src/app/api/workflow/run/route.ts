@@ -71,6 +71,30 @@ function sseEvent(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
+const TX_HASH_RE = /0x[0-9a-fA-F]{64}/;
+
+function decodeBase64Json(raw: string): Record<string, unknown> | null {
+  try {
+    const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
+    const padded =
+      normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+    return JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function extractX402TxHash(value: unknown): string | null {
+  if (!value || typeof value !== "string") return null;
+  const decoded = decodeBase64Json(value);
+  const fromHeader = decoded?.transaction;
+  if (typeof fromHeader === "string" && TX_HASH_RE.test(fromHeader)) {
+    return fromHeader.match(TX_HASH_RE)?.[0] ?? null;
+  }
+  const inline = value.match(TX_HASH_RE);
+  return inline ? inline[0] : null;
+}
+
 // ── POST handler ────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -126,7 +150,7 @@ export async function POST(req: NextRequest) {
           send("step", {
             id: "timestamp",
             status: "running",
-            label: "Synchronize Chain Timestamp",
+            label: "Synchronize Chain Timestamp (Anvil local only)",
             detail: "Aligning Anvil block time with wall clock",
           });
 
@@ -155,14 +179,14 @@ export async function POST(req: NextRequest) {
           send("step", {
             id: "timestamp",
             status: "complete",
-            label: "Synchronize Chain Timestamp",
+            label: "Synchronize Chain Timestamp (Anvil local only)",
             detail: `Block timestamp set to ${currentTs}`,
           });
         } else {
           send("step", {
             id: "timestamp",
             status: "complete",
-            label: "Synchronize Chain Timestamp",
+            label: "Synchronize Chain Timestamp (Anvil local only)",
             detail: `Using real Base Sepolia (${RPC_URL})`,
           });
         }
@@ -215,6 +239,7 @@ export async function POST(req: NextRequest) {
           let documentExtractionHash = "";
           let kybProviderStatus = "";
           let kybProviderScore = 0;
+          let kybX402TxHash = "";
 
           const processLine = (line: string) => {
             // Strip ANSI color codes
@@ -349,10 +374,38 @@ export async function POST(req: NextRequest) {
                   x402Network: "base-sepolia",
                   ...(X402_PAYER ? { x402Payer: X402_PAYER } : {}),
                   ...(X402_PAY_TO ? { x402PayTo: X402_PAY_TO } : {}),
+                  ...(kybX402TxHash ? { x402TxHash: kybX402TxHash } : {}),
                   x402Scheme: "exact",
                   x402Protocol: "EIP-3009 (transferWithAuthorization)",
                 },
               });
+            }
+
+            if (trimmed.includes("x402 payment settled txHash=")) {
+              const match = trimmed.match(/txHash=(0x[0-9a-fA-F]{64})/);
+              if (match?.[1]) {
+                kybX402TxHash = match[1];
+                send("step", {
+                  id: "kyb",
+                  status: "complete",
+                  label: "Run KYB Verification (Sumsub + x402)",
+                  detail: `Status: ${kybProviderStatus || "UNKNOWN"} · Provider Score: ${kybProviderScore}/1000 · Payment tx: ${kybX402TxHash.slice(0, 10)}...${kybX402TxHash.slice(-8)}`,
+                  data: {
+                    providerStatus: kybProviderStatus || "UNKNOWN",
+                    providerScore: Number(kybProviderScore || 0),
+                    x402Payment: true,
+                    x402Amount: "0.01",
+                    x402Asset: "USDC",
+                    x402AssetAddress: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+                    x402Network: "base-sepolia",
+                    ...(X402_PAYER ? { x402Payer: X402_PAYER } : {}),
+                    ...(X402_PAY_TO ? { x402PayTo: X402_PAY_TO } : {}),
+                    x402TxHash: kybX402TxHash,
+                    x402Scheme: "exact",
+                    x402Protocol: "EIP-3009 (transferWithAuthorization)",
+                  },
+                });
+              }
             }
 
             if (trimmed.includes("Starting Gemini AI risk assessment")) {
@@ -511,6 +564,36 @@ export async function POST(req: NextRequest) {
             try {
               simResult = JSON.parse(rawMatch[1].replace(/\\"/g, '"'));
             } catch { /* give up */ }
+          }
+        }
+
+        if (simResult) {
+          const directTxHash =
+            typeof simResult.x402TxHash === "string" &&
+            TX_HASH_RE.test(simResult.x402TxHash)
+              ? (simResult.x402TxHash.match(TX_HASH_RE)?.[0] ?? "")
+              : "";
+          const headerTxHash = extractX402TxHash(simResult.x402PaymentResponseHeader);
+          const finalX402TxHash = directTxHash || headerTxHash || "";
+          if (finalX402TxHash) {
+            send("step", {
+              id: "kyb",
+              status: "complete",
+              label: "Run KYB Verification (Sumsub + x402)",
+              detail: `x402 payment settled · tx: ${finalX402TxHash.slice(0, 10)}...${finalX402TxHash.slice(-8)}`,
+              data: {
+                x402Payment: true,
+                x402Amount: "0.01",
+                x402Asset: "USDC",
+                x402AssetAddress: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+                x402Network: "base-sepolia",
+                ...(X402_PAYER ? { x402Payer: X402_PAYER } : {}),
+                ...(X402_PAY_TO ? { x402PayTo: X402_PAY_TO } : {}),
+                x402TxHash: finalX402TxHash,
+                x402Scheme: "exact",
+                x402Protocol: "EIP-3009 (transferWithAuthorization)",
+              },
+            });
           }
         }
 

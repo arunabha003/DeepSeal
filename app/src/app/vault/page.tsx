@@ -51,7 +51,7 @@ export default function VaultPage() {
 
   const totalAssets = (vaultData?.[0]?.result as bigint) ?? 0n;
   const totalSupply = (vaultData?.[1]?.result as bigint) ?? 0n;
-  const vaultName = (vaultData?.[2]?.result as string) ?? "RWA Vault";
+  const vaultName = (vaultData?.[2]?.result as string) ?? "DeepSeal Vault";
   const vaultSymbol = (vaultData?.[3]?.result as string) ?? "rvDUSD";
   const rawDecimals = vaultData?.[4]?.result;
   const vaultDecimals = typeof rawDecimals === "number" ? rawDecimals : Number((rawDecimals as bigint | undefined) ?? 6n);

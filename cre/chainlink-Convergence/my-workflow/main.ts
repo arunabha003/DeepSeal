@@ -216,6 +216,23 @@ const safeJsonParse = (s: string): any => {
 	}
 }
 
+const decodeX402TxHash = (header?: string): `0x${string}` | undefined => {
+	if (!header) return undefined
+	try {
+		const normalized = header.replace(/-/g, '+').replace(/_/g, '/')
+		const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
+		const decoded = Buffer.from(padded, 'base64').toString('utf-8')
+		const parsed = safeJsonParse(decoded)
+		const transaction = String(parsed?.transaction || '').trim()
+		if (/^0x[0-9a-fA-F]{64}$/.test(transaction)) {
+			return transaction as `0x${string}`
+		}
+	} catch {
+		// Ignore decode errors; header may be missing or in unexpected format.
+	}
+	return undefined
+}
+
 const parseTriggerInput = (raw: string): any => {
 	const trimmed = raw.trim()
 	try {
@@ -973,6 +990,7 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 						providerStatus: identical,
 						providerScore: median,
 						providerResponseHash: identical,
+						xPaymentResponseHeader: identical,
 					}),
 				)(runtime.config)
 				.result()
@@ -984,10 +1002,15 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 						providerStatus: identical,
 						providerScore: median,
 						providerResponseHash: identical,
+						xPaymentResponseHeader: identical,
 					}),
 				)(runtime.config)
 				.result()
 	runtime.log(`KYB providerStatus=${kyb.providerStatus} providerScore=${kyb.providerScore}`)
+	const x402TxHash = decodeX402TxHash(kyb.xPaymentResponseHeader)
+	if (x402TxHash) {
+		runtime.log(`x402 payment settled txHash=${x402TxHash}`)
+	}
 	runtime.log(`Starting Gemini AI risk assessment model=${runtime.config.geminiModel}`)
 
 	const prompt = [
@@ -1064,6 +1087,8 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 		extractionHash,
 		documentSourceHash,
 		attestationHash,
+		x402PaymentResponseHeader: kyb.xPaymentResponseHeader || null,
+		x402TxHash: x402TxHash || null,
 		txHash: tx,
 	})
 }

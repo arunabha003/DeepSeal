@@ -31,7 +31,7 @@ interface WorkflowMonitorProps {
 /* ── Step definitions (pipeline order) ───────────────────────────────── */
 const PIPELINE: { id: string; label: string }[] = [
   { id: "payload", label: "Build Trigger Payload" },
-  { id: "timestamp", label: "Synchronize Chain Timestamp" },
+  { id: "timestamp", label: "Synchronize Chain Timestamp (Anvil local only)" },
   { id: "cre-init", label: "Initialize CRE Simulation" },
   { id: "read-request", label: "Read On-Chain Request" },
   { id: "doc-resolve", label: "Resolve & Verify Document Bundle" },
@@ -168,7 +168,7 @@ export function WorkflowMonitor({
             CRE Workflow — Request #{requestId}
           </h2>
           <p className="text-xs text-muted mt-0.5">
-            Chainlink CRE execution: on-chain read → document verify → KYB + AI → on-chain report
+            DeepSeal flow: on-chain read → document verify → KYB + AI → on-chain report
           </p>
         </div>
         <div className="flex gap-2">
@@ -409,6 +409,21 @@ export function WorkflowMonitor({
                                 {String(step.data.x402Scheme || "exact")}
                               </span>
                             </div>
+                            {typeof step.data.x402TxHash === "string" &&
+                              /^0x[0-9a-fA-F]{64}$/.test(step.data.x402TxHash) && (
+                                <div className="col-span-2">
+                                  <span className="text-muted block">Payment Tx</span>
+                                  <a
+                                    href={txUrl(step.data.x402TxHash)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-mono text-accent hover:underline inline-flex items-center gap-0.5"
+                                  >
+                                    {step.data.x402TxHash.slice(0, 10)}...{step.data.x402TxHash.slice(-8)}
+                                    <span className="text-[9px]">↗</span>
+                                  </a>
+                                </div>
+                              )}
                             <div className="col-span-2">
                               <span className="text-muted block">USDC Contract</span>
                               <a
@@ -804,7 +819,7 @@ export function WorkflowMonitor({
         <div className="bg-surface-1 border border-surface-3 rounded-lg overflow-hidden">
           <div className="px-4 py-3 border-b border-surface-3 flex items-center justify-between">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">
-              Raw Logs
+              Workflow Terminal Output
             </span>
             <span className="text-[10px] font-mono text-zinc-500">
               {logs.length} lines

@@ -44,6 +44,23 @@ const truncateMiddle = (value: string, start = 42, end = 18) => {
   return `${value.slice(0, start)}...${value.slice(-end)}`;
 };
 
+const formatSignedScore = (value: bigint, decimals: number, maxFractionDigits = 2) => {
+  const normalizedDecimals = Math.max(0, decimals);
+  if (normalizedDecimals === 0) return value.toString();
+
+  const negative = value < 0n;
+  const abs = negative ? -value : value;
+  const base = 10n ** BigInt(normalizedDecimals);
+  const whole = abs / base;
+  const fraction = abs % base;
+  if (fraction === 0n) return `${negative ? "-" : ""}${whole.toString()}`;
+
+  const fractionPadded = fraction.toString().padStart(normalizedDecimals, "0");
+  const clipped = fractionPadded.slice(0, maxFractionDigits);
+  const trimmed = clipped.replace(/0+$/, "");
+  return `${negative ? "-" : ""}${whole.toString()}${trimmed ? `.${trimmed}` : ""}`;
+};
+
 export default function AgentsPage() {
   const [tab, setTab] = useState<
     "browse" | "register" | "feedback" | "validate"
@@ -344,6 +361,14 @@ function AgentRow({
     query: { refetchInterval: 8_000 },
   });
 
+  const { data: repLastIndex } = useReadContract({
+    address: REP,
+    abi: ReputationRegistryABI,
+    functionName: "getLastIndex",
+    args: [agentId, RECV],
+    query: { refetchInterval: 8_000 },
+  });
+
   /* Validation reads */
   const { data: validationsData } = useReadContract({
     address: VAL,
@@ -358,19 +383,17 @@ function AgentRow({
   const validations = (validationsData as `0x${string}`[] | undefined) ?? [];
 
   // Reputation summary: [count, summaryValue, summaryValueDecimals]
-  const repCount = repSummary
+  const repCountFromSummary = repSummary
     ? Number((repSummary as readonly [bigint, bigint, number])[0])
     : 0;
+  const repCount = Number(repLastIndex ?? 0n) || repCountFromSummary;
   const repValue = repSummary
-    ? Number((repSummary as readonly [bigint, bigint, number])[1])
-    : 0;
+    ? ((repSummary as readonly [bigint, bigint, number])[1] as bigint)
+    : 0n;
   const repDecimals = repSummary
     ? Number((repSummary as readonly [bigint, bigint, number])[2])
     : 0;
-  const repDisplay =
-    repDecimals > 0
-      ? (repValue / Math.pow(10, repDecimals)).toFixed(repDecimals)
-      : repValue.toString();
+  const repDisplay = formatSignedScore(repValue, repDecimals, 2);
 
   const roleLabel = isRepAgent
     ? "Reputation Agent"
@@ -412,24 +435,7 @@ function AgentRow({
             <p className="text-[11px] text-muted">{roleLabel}</p>
           </div>
         </div>
-        <div className="flex items-center gap-4 text-xs">
-          <div className="text-right">
-            <span className="text-muted block text-[10px]">Reputation</span>
-            <span className="font-mono text-white font-bold">
-              {repCount > 0 ? repDisplay : "\u2014"}
-            </span>
-            {repCount > 0 && (
-              <span className="text-muted ml-1">
-                ({repCount} feedback{repCount !== 1 ? "s" : ""})
-              </span>
-            )}
-          </div>
-          <div className="text-right">
-            <span className="text-muted block text-[10px]">Validations</span>
-            <span className="font-mono text-white font-bold">
-              {validations.length}
-            </span>
-          </div>
+        <div className="flex items-center gap-3 text-xs">
           <span className="text-zinc-600 text-lg">
             {expanded ? "\u25BE" : "\u25B8"}
           </span>
