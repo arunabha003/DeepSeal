@@ -1,4 +1,4 @@
-# CRE Workflow — Confidential RWA Due-Diligence
+# CRE Workflow — DeepSeal
 
 This folder contains the fully-implemented Chainlink CRE workflow that orchestrates the
 end-to-end compliance pipeline:
