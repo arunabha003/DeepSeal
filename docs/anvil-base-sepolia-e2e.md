@@ -1,6 +1,6 @@
 # Anvil Base Sepolia Fork E2E (real Sumsub + real Gemini + x402 + ERC-8004)
 
-This flow runs the protocol on an Anvil Base Sepolia fork using **CRE local simulation** plus real external integrations (no KYB/LLM mocks).
+This flow runs the protocol on an Anvil Base Sepolia fork using **CRE local simulation** plus real external integrations.
 
 ---
 
@@ -14,7 +14,7 @@ This flow runs the protocol on an Anvil Base Sepolia fork using **CRE local simu
 | 7 | `0x14dC79964da2C08dA15Fd353d30d9AA8CAF8a592` | `0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356` | Only clean EOA on Base Sepolia fork (no EIP-7702 code) |
 | derived | `0x4e767bE56A8e70759544831e6e1825c94f945cE3` | `0x741a86b698ac6e746fc8df15e352e4c148ad970618c1085bd92b76b58e2daba3` | **Agent Registrar** (derived from `keccak256("RWA_AGENT_REGISTRAR_PRIVATE_KEY_V1")`) |
 
-> **x402 Buyer must be Account #1** (`0x7099...`). It has forked USDC balance on Base Sepolia. Its EIP-7702 delegation code must be cleared before x402 payments work (see step 2.5).
+
 
 
 ## ERC-8004 Agents
@@ -30,13 +30,12 @@ actual `ERC8004 ReputationAgentId` and `ERC8004 ValidationAgentId`.
 - `cre` CLI + `bun`
 - `services/kyb-provider/.env` filled with real Sumsub sandbox values
 - `cre/chainlink-Convergence/.env` filled with `GEMINI_API_KEY`
+- Sumsub level configured for business verification (`SUMSUB_LEVEL_NAME`)
 
 ## 1) Start Anvil on a Base Sepolia fork
 ```bash
 anvil --fork-url https://sepolia.base.org --chain-id 84532 --host 127.0.0.1 --port 8545
 ```
-
-This gives you chain ID **84532** and 10 pre-funded accounts with 10000 ETH each.
 
 ## 2) Configure environment files
 
@@ -166,6 +165,14 @@ forge script script/SubmitRequest.s.sol:SubmitRequest --rpc-url "$RPC_URL" --bro
 cd services/kyb-provider
 npm install && npm run dev
 ```
+
+Verify Sumsub auth:
+
+```bash
+curl -s http://127.0.0.1:3001/sumsub/healthz | jq
+```
+
+Expected: `authValid: true`.
 
 ## 8) Preflight checks
 ```bash

@@ -48,7 +48,7 @@ This flow runs the full protocol on **real Base Sepolia** using CRE staging simu
 - `cre` CLI + `bun`
 - Node.js 18+
 - Real Base Sepolia ETH in deployer wallet (get from [Base Sepolia Faucet](https://www.coinbase.com/faucets/base-ethereum-goerli-faucet))
-- Sumsub sandbox keys (or `FORCE_APPROVE=true`) — see [Sumsub Setup](sumsub-setup.md)
+- Sumsub sandbox keys (or `FORCE_APPROVE=true`)
 - Gemini API key (free from [aistudio.google.com](https://aistudio.google.com))
 
 ## 1) Deploy contracts to Base Sepolia
@@ -93,6 +93,29 @@ Fill in your API keys and private keys in each file. The `.example` files alread
 | `services/kyb-provider/.env` | `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY`, `X402_PAY_TO`, `X402_RPC_URL`, `X402_RELAYER_PRIVATE_KEY` |
 | `cre/chainlink-Convergence/.env` | `CRE_ETH_PRIVATE_KEY`, `GEMINI_API_KEY`, `X402_BUYER_PRIVATE_KEY` |
 | `app/.env.local` | `DEPLOYER_PRIVATE_KEY`, `RPC_URL` |
+
+### Sumsub setup (inlined)
+
+Required `services/kyb-provider/.env` fields:
+- `SUMSUB_BASE_URL=https://api.sumsub.com`
+- `SUMSUB_APP_TOKEN=<your_app_token>`
+- `SUMSUB_SECRET_KEY=<your_secret_key>`
+- `SUMSUB_LEVEL_NAME=<your_business_level_name>`
+
+Auth verification:
+
+```bash
+cd services/kyb-provider
+npm run check:sumsub
+```
+
+Or when server is running:
+
+```bash
+curl -s http://127.0.0.1:3001/sumsub/healthz | jq
+```
+
+Expected: `authValid: true`.
 
 ## 3) Update contract addresses (only if you redeployed)
 
