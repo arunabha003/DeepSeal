@@ -6,13 +6,11 @@ import {
   DiligencePortalABI,
   ComplianceRegistryABI,
   RWAVaultABI,
-  DemoUSDABI,
-  IdentityRegistryABI,
   RWAComplianceReceiverABI,
 } from "@/lib/abis";
 import { Card, CardTitle, Stat, Badge, StatusDot, AddressLink } from "@/components/ui";
-import { truncAddr, formatUnits, addressUrl } from "@/lib/utils";
-import { NETWORK, IS_LOCAL, BLOCK_EXPLORER } from "@/lib/network";
+import { formatUnits } from "@/lib/utils";
+import { IS_LOCAL } from "@/lib/network";
 import Link from "next/link";
 
 export default function Dashboard() {
@@ -32,12 +30,6 @@ export default function Dashboard() {
     address: ADDRESSES.RWAVault as `0x${string}`,
     abi: RWAVaultABI,
     functionName: "totalSupply",
-  });
-
-  const { data: nextAgentId } = useReadContract({
-    address: ADDRESSES.IdentityRegistry as `0x${string}`,
-    abi: IdentityRegistryABI,
-    functionName: "nextAgentId",
   });
 
   const { data: registryOwner } = useReadContract({
@@ -71,7 +63,10 @@ export default function Dashboard() {
   });
 
   const totalRequests = nextRequestId ? Number(nextRequestId) - 1 : 0;
-  const totalAgents = nextAgentId ? Number(nextAgentId) - 1 : 0;
+  const protocolAgentIds = [repAgentId, valAgentId]
+    .filter((id): id is bigint => typeof id === "bigint" && id > 0n)
+    .map((id) => id.toString());
+  const totalAgents = new Set(protocolAgentIds).size;
   const tvl = vaultTotalAssets ? formatUnits(vaultTotalAssets as bigint, 6) : "0";
   const shares = vaultTotalSupply ? formatUnits(vaultTotalSupply as bigint, 6) : "0";
 

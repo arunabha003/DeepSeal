@@ -118,7 +118,7 @@ export function Nav() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <Link href="/" className="text-sm font-semibold tracking-tight text-white">
-            RWA<span className="text-accent">Vault</span>
+            Deep<span className="text-accent">Seal</span>
           </Link>
           <nav className="hidden sm:flex items-center gap-1">
             {links.map((l) => (

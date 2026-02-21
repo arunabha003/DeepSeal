@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
             id: "timestamp",
             status: "complete",
             label: "Synchronize Chain Timestamp (Anvil local only)",
-            detail: `Using real Base Sepolia (${RPC_URL})`,
+            detail: `Using Base Sepolia Testnet `,
           });
         }
 
