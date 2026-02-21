@@ -1,13 +1,15 @@
-# Confidential RWA Due-Diligence Vault
+# DeepSeal
 
 
 
-A compliance-gated **ERC-4626 vault** for Real World Assets, where access is controlled by an automated due-diligence pipeline that orchestrates **KYB verification** (Sumsub via x402 micropayments), **AI risk scoring** (Google Gemini), **on-chain attestations** (EAS), and **agent reputation tracking** (ERC-8004) — all powered by a single **Chainlink CRE workflow**.
+DeepSeal is a compliance-gated **ERC-4626 vault** for Real World Assets, where access is controlled by an automated due-diligence pipeline that orchestrates **KYB verification** (Sumsub via x402 micropayments), **AI risk scoring** (Google Gemini), **on-chain attestations** (EAS), and **agent reputation tracking** (ERC-8004) — all powered by a single **Chainlink CRE workflow**.
 
 One CRE workflow execution reads an on-chain request, resolves an IPFS document bundle, verifies the company via KYB, scores risk with Gemini AI, and writes the result on-chain — triggering a cascade of **9 events** across 5 contracts in a single transaction: compliance approval, EAS attestation, and ERC-8004 agent reputation + validation artifacts.
 
+![Protocol Architecture](docs/protocol-diagram.png)
+
 Implementation details: [`docs/implementation.md`](docs/implementation.md)  
-Visual diagram: [`docs/protocol-diagram.html`](docs/protocol-diagram.html)
+Visual diagram: [`docs/protocol-diagram.png`](docs/protocol-diagram.png)
 
 ---
 
@@ -41,7 +43,7 @@ Visual diagram: [`docs/protocol-diagram.html`](docs/protocol-diagram.html)
 | **EAS Contract** *(Base Sepolia native)* | [`0x4200000000000000000000000000000000000021`](https://sepolia.basescan.org/address/0x4200000000000000000000000000000000000021) |
 | **EAS Schema Registry** | [`0x4200000000000000000000000000000000000020`](https://sepolia.basescan.org/address/0x4200000000000000000000000000000000000020) |
 
-**ERC-8004 Agents:** #916 (Reputation), #917 (Validation) — [View on 8004scan](https://8004scan.vercel.app)  
+**ERC-8004 Agents:** [#916 Reputation](https://testnet.8004scan.io/agents/base-sepolia/916), [#917 Validation](https://testnet.8004scan.io/agents/base-sepolia/917) · [Browse all](https://testnet.8004scan.io/agents/base-sepolia)  
 **EAS Schema UID:** `0x91f39675fa85b9340ba36983e388a4b9238c55ac7f593f2c87ba0c55115dd06a`
 
 ---
@@ -115,7 +117,6 @@ cd services/kyb-provider
 npm run check:sumsub
 ```
 
-Expected: `authValid: true`. If `false` with `401/403`, token/secret/signature inputs are incorrect.
 
 ### 3. Start Services
 
