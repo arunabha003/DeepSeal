@@ -117,6 +117,7 @@ This document is organized in two parts:
 |----------|------|-------------|
 | Main project readme | `README.md` | End-to-end project setup and usage overview. |
 | Implementation guide | `docs/implementation.md` | File review + deep-dive (this doc). |
+| Visual protocol diagram | `docs/protocol-diagram.html` | Single-file architecture visual for submission/demo. |
 | Anvil e2e runbook | `docs/anvil-base-sepolia-e2e.md` | Local fork execution runbook. |
 | Base Sepolia runbook | `docs/base-sepolia-deployment.md` | Live testnet deployment/runbook. |
 | Sample upload bundle | `docs/acme-company-bundle.upload.json` | Example document bundle payload for IPFS upload. |
@@ -207,4 +208,3 @@ The frontend is not just a form UI; it is also the operator console. Submit, pro
 - If CRE linked secrets are unavailable in an org, local config fallback tooling is used.
 - On Base Sepolia fork mode, EIP-7702 delegated account code may need clearing before x402 USDC signature paths.
 - Sumsub sandbox outcomes can require explicit sandbox transition APIs for deterministic demo paths.
-

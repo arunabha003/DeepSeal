@@ -1,31 +1,32 @@
-# 🏛️ Confidential RWA Due-Diligence Vault
+# Confidential RWA Due-Diligence Vault
 
-> **Hackathon submission — Chainlink CRE (Compute Runtime Environment)**
+
 
 A compliance-gated **ERC-4626 vault** for Real World Assets, where access is controlled by an automated due-diligence pipeline that orchestrates **KYB verification** (Sumsub via x402 micropayments), **AI risk scoring** (Google Gemini), **on-chain attestations** (EAS), and **agent reputation tracking** (ERC-8004) — all powered by a single **Chainlink CRE workflow**.
 
 One CRE workflow execution reads an on-chain request, resolves an IPFS document bundle, verifies the company via KYB, scores risk with Gemini AI, and writes the result on-chain — triggering a cascade of **9 events** across 5 contracts in a single transaction: compliance approval, EAS attestation, and ERC-8004 agent reputation + validation artifacts.
 
-**Live on Base Sepolia** · [Architecture Docs](docs/architecture.md) · [8004scan Agents](https://8004scan.vercel.app)
+Implementation details: [`docs/implementation.md`](docs/implementation.md)  
+Visual diagram: [`docs/protocol-diagram.html`](docs/protocol-diagram.html)
 
 ---
 
-## 🧩 Key Features
+## Key Components
 
 | Feature | What It Does |
 |---------|-------------|
-| **⛓️ Chainlink CRE** | Off-chain orchestration engine — a single TypeScript workflow reads on-chain requests, calls external APIs, scores risk, and writes the compliance result back on-chain via `EVMClient.writeReport()` |
-| **💳 x402 Micropayments** | KYB verification is paywalled with the x402 HTTP payment protocol — CRE workflow pays 0.01 USDC per call using EIP-3009 `transferWithAuthorization` (402 → sign → retry) |
-| **📜 EAS Attestations** | Every compliance decision is attested on-chain via the Ethereum Attestation Service (Base Sepolia native) — immutable, verifiable proof of due-diligence |
-| **🤖 ERC-8004 Agent Trust** | Two NFT-based agent identities (Agents #916 & #917) with reputation feedback scores (0-100) and validation request/response records on official ERC-8004 registries |
-| **🧠 Google Gemini AI** | Structured risk scoring — company context + KYB data fed to Gemini 2.5 Flash → `{ approved, riskScore: 0-1000, reasons[] }` with automatic model fallback |
-| **📦 IPFS / Pinata** | Company document bundles stored on IPFS, referenced by `metadataUri` in on-chain requests — CRE workflow resolves and verifies with deterministic `sourceHash` + `extractionHash` |
-| **🏦 ERC-4626 Compliance Vault** | Yield vault where deposits require `ComplianceRegistry.isApproved()` — no admin keys, fully on-chain access control driven by CRE workflow output |
-| **🖥️ Real-Time Frontend** | Next.js 14 app with SSE streaming of CRE workflow execution — 6 pages covering submit, process, compliance lookup, vault operations, and ERC-8004 agent browsing |
+| **Chainlink CRE** | Off-chain orchestration engine — a single TypeScript workflow reads on-chain requests, calls external APIs, scores risk, and writes the compliance result back on-chain via `EVMClient.writeReport()` |
+| **x402 Micropayments** | KYB verification is paywalled with the x402 HTTP payment protocol — CRE workflow pays 0.01 USDC per call using EIP-3009 `transferWithAuthorization` (402 → sign → retry) |
+| **EAS Attestations** | Every compliance decision is attested on-chain via the Ethereum Attestation Service (Base Sepolia native) — immutable, verifiable proof of due-diligence |
+| **ERC-8004 Agent Trust** | Two NFT-based agent identities (Agents #916 & #917) with reputation feedback scores (0-100) and validation request/response records on official ERC-8004 registries |
+| **Google Gemini AI** | Structured risk scoring — company context + KYB data fed to Gemini 2.5 Flash → `{ approved, riskScore: 0-1000, reasons[] }` with automatic model fallback |
+| **IPFS / Pinata** | Company document bundles stored on IPFS, referenced by `metadataUri` in on-chain requests — CRE workflow resolves and verifies with deterministic `sourceHash` + `extractionHash` |
+| **ERC-4626 Compliance Vault** | Yield vault where deposits require `ComplianceRegistry.isApproved()` — no admin keys, fully on-chain access control driven by CRE workflow output |
+| **Real-Time Frontend** | Next.js 14 app with SSE streaming of CRE workflow execution — 6 pages covering submit, process, compliance lookup, vault operations, and ERC-8004 agent browsing |
 
 ---
 
-## 📍 Live Deployed Addresses (Base Sepolia)
+## Live Deployed Addresses (Base Sepolia)
 
 | Contract | Address |
 |----------|---------|
@@ -45,7 +46,7 @@ One CRE workflow execution reads an on-chain request, resolves an IPFS document 
 
 ---
 
-## 🚀 How to Run (Using Deployed Contracts)
+## How to Run (Using Deployed Contracts)
 
 The contracts are already deployed on **Base Sepolia** at the addresses above. Follow these steps to run the full pipeline locally.
 
@@ -94,7 +95,7 @@ cp app/.env.local.example app/.env.local
 
 Edit each file and fill in your API keys and private keys. The `.example` files contain testnet addresses pre-filled — you only need to add secrets.
 
-> ⚠️ Never commit `.env` files. They are all gitignored.
+> Never commit `.env` files. They are all gitignored.
 
 ### 2.1 Sumsub keys and quick verification
 
@@ -154,11 +155,11 @@ cre workflow simulate ./my-workflow \
 
 ---
 
-## 📁 Chainlink CRE Files
+## Chainlink CRE Files
 
 | File | Description |
 |------|-------------|
-| [`cre/chainlink-Convergence/my-workflow/main.ts`](cre/chainlink-Convergence/my-workflow/main.ts) | **CRE Workflow** — 1082-line TypeScript workflow: HTTP trigger → read on-chain request → resolve IPFS doc → deterministic extraction → KYB (x402) → Gemini AI risk scoring → write compliance report on-chain |
+| [`cre/chainlink-Convergence/my-workflow/main.ts`](cre/chainlink-Convergence/my-workflow/main.ts) | **CRE Workflow** — 1081-line TypeScript workflow: HTTP trigger → read on-chain request → resolve IPFS doc → deterministic extraction → KYB (x402) → Gemini AI risk scoring → write compliance report on-chain |
 | [`cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json`](cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json) | CRE config for local Anvil fork simulation |
 | [`cre/chainlink-Convergence/my-workflow/config.staging.json`](cre/chainlink-Convergence/my-workflow/config.staging.json) | CRE config for Base Sepolia staging |
 | [`cre/chainlink-Convergence/project.yaml`](cre/chainlink-Convergence/project.yaml) | CRE project settings — RPC targets for anvil / staging / production |
@@ -172,7 +173,7 @@ cre workflow simulate ./my-workflow \
 
 ---
 
-## ⚙️ How CRE Is Used
+## How CRE Is Used
 
 ### The Problem
 
@@ -183,7 +184,7 @@ Compliance verification for RWAs requires multiple off-chain data sources (KYB p
 
 ### CRE as the Orchestration Layer
 
-The **Chainlink CRE workflow** (`main.ts`, 1082 lines) is the brain of the protocol. It runs as a TypeScript program in Chainlink's decentralized compute nodes, orchestrating the entire pipeline:
+The **Chainlink CRE workflow** (`main.ts`, 1081 lines) is the brain of the protocol. It runs as a TypeScript program in Chainlink's decentralized compute nodes, orchestrating the entire pipeline:
 
 ```
 HTTP Trigger (requestId)
@@ -223,14 +224,6 @@ EVMClient.writeReport() ──► RWAComplianceReceiver.onReport()
 | **`runtime.log()`** | Observable logging — each step logs progress, parsed by frontend SSE for real-time visualization |
 | **`encodeCallMsg` + `encodeAbiParameters`** | ABI encoding for on-chain reads/writes |
 | **`getNetwork()`** | Chain selector resolution for EVMClient targets |
-
-### Key Design Choices
-
-1. **Single workflow, multiple side-effects** — One `writeReport` call triggers compliance update + EAS attestation + 2× reputation feedback + validation request/response
-2. **Observable logging** — `runtime.log()` calls at each step enable the frontend to show real-time progress via SSE
-3. **x402 buyer flow** — CRE workflow implements the full 402 → sign → retry pattern for micropayments
-4. **Model fallback** — If the configured Gemini model is unavailable, the workflow auto-discovers an available one
-5. **Document provenance** — sourceHash + extractionHash computed deterministically for auditability
 
 ---
 
