@@ -208,7 +208,7 @@ contract Deploy is Script {
         // 8004scan expects: type, name, description, protocol, endpoints, active, supportedTrust
         string memory json = '{"type":"https://eips.ethereum.org/EIPS/eip-8004#registration-v1",'
             '"name":"RWA Diligence Reputation Agent",'
-            '"description":"Chainlink CRE-powered reputation agent for the Confidential RWA Due-Diligence Vault. Records on-chain reputation feedback after processing KYB verification, AI risk assessment, and compliance decisions for real-world asset tokenization.",'
+            '"description":"Chainlink CRE-powered reputation agent for DeepSeal. Records on-chain reputation feedback after processing KYB verification, AI risk assessment, and compliance decisions for real-world asset tokenization.",'
             '"protocol":"chainlink-cre",'
             '"endpoints":[{"name":"web","endpoint":"https://github.com/arunabha003/Chainlink-Convergence"},{"name":"x402","endpoint":"http://127.0.0.1:3001/kyb","version":"1.0","skills":["kyb-verification","risk-assessment","compliance"],"domains":["rwa","defi","compliance"]}],'
             '"x402Support":true,'
@@ -221,7 +221,7 @@ contract Deploy is Script {
     function _buildValidationAgentUri() internal pure returns (string memory) {
         string memory json = '{"type":"https://eips.ethereum.org/EIPS/eip-8004#registration-v1",'
             '"name":"RWA Diligence Validation Agent",'
-            '"description":"Chainlink CRE-powered validation agent for the Confidential RWA Due-Diligence Vault. Issues on-chain validation requests and auto-responses after compliance decisions, tracking the full audit trail of KYB and AI risk assessments.",'
+            '"description":"Chainlink CRE-powered validation agent for DeepSeal. Issues on-chain validation requests and auto-responses after compliance decisions, tracking the full audit trail of KYB and AI risk assessments.",'
             '"protocol":"chainlink-cre",'
             '"endpoints":[{"name":"web","endpoint":"https://github.com/arunabha003/Chainlink-Convergence"},{"name":"x402","endpoint":"http://127.0.0.1:3001/kyb","version":"1.0","skills":["validation","compliance-audit","risk-tracking"],"domains":["rwa","defi","compliance"]}],'
             '"x402Support":true,'
