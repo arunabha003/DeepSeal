@@ -85,7 +85,7 @@ export default function Dashboard() {
           </Badge>
         </div>
         <p className="text-sm text-muted mt-1">
-          Confidential RWA Due-Diligence Vault — live on-chain state
+          DeepSeal — live on-chain state
         </p>
       </div>
 

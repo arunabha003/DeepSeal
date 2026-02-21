@@ -13,11 +13,15 @@ import {
 import { keccak256, toHex } from "viem";
 import { ADDRESSES } from "@/lib/addresses";
 import { DiligencePortalABI } from "@/lib/abis";
-import { Card, CardTitle, Button, Badge, AddressLink, TxLink } from "@/components/ui";
+import { Card, CardTitle, Button, Badge, AddressLink } from "@/components/ui";
 import { anvilBaseSepolia } from "@/lib/wagmi";
-import { BLOCK_EXPLORER } from "@/lib/network";
-import { txUrl, addressUrl, truncAddr } from "@/lib/utils";
+import { txUrl } from "@/lib/utils";
 import Link from "next/link";
+
+const truncateMiddle = (value: string, start = 22, end = 14) => {
+  if (!value || value.length <= start + end + 3) return value;
+  return `${value.slice(0, start)}...${value.slice(-end)}`;
+};
 
 export default function SubmitPage() {
   const { address, isConnected } = useAccount();
@@ -264,14 +268,24 @@ function RequestRow({ requestId }: { requestId: number }) {
   if (!req) return null;
 
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-surface-3 last:border-0">
-      <div className="flex items-center gap-3">
+    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 items-center py-3 border-b border-surface-3 last:border-0">
+      <div className="pt-0.5">
         <span className="text-xs font-mono text-accent">#{requestId}</span>
-        <AddressLink address={req.subject || ""} chars={6} />
       </div>
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-muted">{req.metadataUri}</span>
-        <span className="text-[11px] font-mono text-muted">
+      <div className="min-w-0">
+        <AddressLink address={req.subject || ""} chars={6} />
+        <a
+          href={req.metadataUri}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={req.metadataUri}
+          className="block mt-1 text-xs text-muted hover:text-zinc-300 transition-colors truncate"
+        >
+          {truncateMiddle(req.metadataUri)}
+        </a>
+      </div>
+      <div className="text-right">
+        <span className="text-[11px] font-mono text-muted whitespace-nowrap">
           {new Date(Number(req.requestedAt) * 1000).toLocaleDateString()}
         </span>
       </div>

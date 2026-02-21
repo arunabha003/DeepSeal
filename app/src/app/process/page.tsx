@@ -5,9 +5,14 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useReadContract } from "wagmi";
 import { ADDRESSES } from "@/lib/addresses";
 import { DiligencePortalABI } from "@/lib/abis";
-import { Card, CardTitle, Badge, Button } from "@/components/ui";
+import { Card, CardTitle, Button, AddressLink } from "@/components/ui";
 import { WorkflowMonitor } from "@/components/workflow-monitor";
 import Link from "next/link";
+
+const truncateMiddle = (value: string, start = 16, end = 12) => {
+  if (!value || value.length <= start + end + 3) return value;
+  return `${value.slice(0, start)}...${value.slice(-end)}`;
+};
 
 function ProcessContent() {
   const searchParams = useSearchParams();
@@ -95,31 +100,35 @@ function ProcessContent() {
       {req && activeId > 0 && (
         <Card>
           <CardTitle>Request #{activeId} — On-Chain Data</CardTitle>
-          <p className="text-[11px] text-muted mb-3">
-            The workflow resolves <code className="font-mono">{req.metadataUri}</code>, verifies it against{" "}
-            <code className="font-mono">docBundleHash</code>, deterministically extracts company fields, then runs KYB + AI.
+          <p className="text-[11px] text-muted mb-4">
+            Resolves the document bundle, verifies the hash, extracts normalized company fields, then runs KYB and AI scoring.
           </p>
-          <div className="grid grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div>
               <span className="text-muted block mb-0.5">Subject</span>
-              <code className="font-mono text-zinc-300 break-all">
-                {req.subject}
-              </code>
+              <AddressLink address={req.subject} chars={8} />
             </div>
             <div>
               <span className="text-muted block mb-0.5">Requester</span>
-              <code className="font-mono text-zinc-400 break-all">
-                {req.requester}
-              </code>
+              <AddressLink address={req.requester} chars={8} />
             </div>
             <div>
               <span className="text-muted block mb-0.5">Metadata URI</span>
-              <code className="font-mono text-zinc-400">{req.metadataUri}</code>
+              <a
+                href={req.metadataUri}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={req.metadataUri}
+                className="font-mono text-zinc-300 hover:text-accent transition-colors flex items-center gap-1 max-w-full"
+              >
+                <span className="truncate min-w-0">{truncateMiddle(req.metadataUri, 34, 16)}</span>
+                <span className="text-[10px]">↗</span>
+              </a>
             </div>
             <div>
               <span className="text-muted block mb-0.5">Doc Bundle Hash</span>
-              <code className="font-mono text-zinc-400">
-                {req.docBundleHash.slice(0, 14)}...
+              <code className="font-mono text-zinc-300" title={req.docBundleHash}>
+                {truncateMiddle(req.docBundleHash, 16, 12)}
               </code>
             </div>
           </div>

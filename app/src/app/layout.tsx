@@ -4,8 +4,8 @@ import { Providers } from "./providers";
 import { Nav } from "@/components/nav";
 
 export const metadata: Metadata = {
-  title: "RWA Diligence Vault",
-  description: "Confidential RWA Due-Diligence Protocol",
+  title: "DeepSeal",
+  description: "DeepSeal RWA Due-Diligence Protocol",
 };
 
 export default function RootLayout({
@@ -29,7 +29,7 @@ export default function RootLayout({
               {children}
             </main>
             <footer className="border-t border-surface-3 py-4 text-center text-xs text-muted">
-              Confidential RWA Due-Diligence Vault -- Chainlink CRE / ERC-8004 / ERC-4626 / x402
+              DeepSeal -- Chainlink CRE / ERC-8004 / ERC-4626 / x402
             </footer>
           </div>
         </Providers>

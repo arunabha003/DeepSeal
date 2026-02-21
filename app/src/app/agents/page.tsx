@@ -39,6 +39,10 @@ const OFFICIAL_REPUTATION_BASE_SEPOLIA =
 
 const isHex32 = (value: string) => /^0x[0-9a-fA-F]{64}$/.test(value);
 const isAddress = (value: string) => /^0x[0-9a-fA-F]{40}$/.test(value);
+const truncateMiddle = (value: string, start = 42, end = 18) => {
+  if (!value || value.length <= start + end + 3) return value;
+  return `${value.slice(0, start)}...${value.slice(-end)}`;
+};
 
 export default function AgentsPage() {
   const [tab, setTab] = useState<
@@ -459,9 +463,16 @@ function AgentRow({
               <span className="text-[10px] uppercase tracking-wider text-muted block mb-1">
                 Token URI
               </span>
-              <span className="text-xs font-mono text-zinc-400 break-all">
-                {uri || "\u2014"}
-              </span>
+              {uri ? (
+                <span
+                  title={uri}
+                  className="text-xs font-mono text-zinc-400 block truncate max-w-full"
+                >
+                  {truncateMiddle(uri)}
+                </span>
+              ) : (
+                <span className="text-xs font-mono text-zinc-500">\u2014</span>
+              )}
             </div>
             <div>
               <span className="text-[10px] uppercase tracking-wider text-muted block mb-1">
@@ -531,37 +542,6 @@ function AgentRow({
             </div>
           )}
 
-          {/* On-chain contract references */}
-          <div className="pt-2 border-t border-zinc-800/50 grid grid-cols-3 gap-3 text-[10px]">
-            <div>
-              <span className="text-muted block mb-0.5">IdentityRegistry</span>
-              <AddressLink
-                address={IDENT}
-                chars={4}
-                className="!text-[10px]"
-              />
-            </div>
-            <div>
-              <span className="text-muted block mb-0.5">
-                ReputationRegistry
-              </span>
-              <AddressLink
-                address={REP}
-                chars={4}
-                className="!text-[10px]"
-              />
-            </div>
-            <div>
-              <span className="text-muted block mb-0.5">
-                ValidationRegistry
-              </span>
-              <AddressLink
-                address={VAL}
-                chars={4}
-                className="!text-[10px]"
-              />
-            </div>
-          </div>
         </div>
       )}
     </Card>

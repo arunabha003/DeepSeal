@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
         send("step", {
           id: "payload",
           status: "running",
-          label: "Preparing Payload",
+          label: "Build Trigger Payload",
           detail: `Request #${requestId}`,
         });
 
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
         send("step", {
           id: "payload",
           status: "complete",
-          label: "Preparing Payload",
+          label: "Build Trigger Payload",
           detail: `Payload written for request #${requestId}`,
         });
 
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
           send("step", {
             id: "timestamp",
             status: "running",
-            label: "Syncing Block Timestamp",
+            label: "Synchronize Chain Timestamp",
             detail: "Aligning Anvil block time with wall clock",
           });
 
@@ -155,14 +155,14 @@ export async function POST(req: NextRequest) {
           send("step", {
             id: "timestamp",
             status: "complete",
-            label: "Syncing Block Timestamp",
+            label: "Synchronize Chain Timestamp",
             detail: `Block timestamp set to ${currentTs}`,
           });
         } else {
           send("step", {
             id: "timestamp",
             status: "complete",
-            label: "Network Mode",
+            label: "Synchronize Chain Timestamp",
             detail: `Using real Base Sepolia (${RPC_URL})`,
           });
         }
@@ -171,7 +171,7 @@ export async function POST(req: NextRequest) {
         send("step", {
           id: "cre-init",
           status: "running",
-          label: "CRE Workflow Engine",
+          label: "Initialize CRE Simulation",
           detail: "Compiling and initializing simulator...",
         });
 
@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
               send("step", {
                 id: "cre-init",
                 status: "complete",
-                label: "CRE Workflow Engine",
+                label: "Initialize CRE Simulation",
                 detail: "Simulator initialized",
               });
             }
@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
               send("step", {
                 id: "read-request",
                 status: "running",
-                label: "Reading On-Chain Request",
+                label: "Read On-Chain Request",
                 detail: `Loading request #${requestId} from DiligencePortal`,
               });
             }
@@ -250,7 +250,7 @@ export async function POST(req: NextRequest) {
               send("step", {
                 id: "read-request",
                 status: "complete",
-                label: "Reading On-Chain Request",
+                label: "Read On-Chain Request",
                 detail: `Subject: ${subjectMatch?.[1] || "?"}`,
                 data: {
                   subject: subjectMatch?.[1],
@@ -261,7 +261,7 @@ export async function POST(req: NextRequest) {
               send("step", {
                 id: "doc-resolve",
                 status: "running",
-                label: "Resolving + Verifying Document Bundle",
+                label: "Resolve & Verify Document Bundle",
                 detail: "Fetching metadata bundle and verifying doc hash...",
               });
             }
@@ -275,7 +275,7 @@ export async function POST(req: NextRequest) {
               send("step", {
                 id: "doc-resolve",
                 status: "complete",
-                label: "Resolving + Verifying Document Bundle",
+                label: "Resolve & Verify Document Bundle",
                 detail: `Verified source hash and extracted normalized company fields`,
                 data: {
                   sourceHash: sourceHashMatch?.[1],
@@ -288,7 +288,7 @@ export async function POST(req: NextRequest) {
                 send("step", {
                   id: "kyb",
                   status: "running",
-                  label: "KYB Verification (Sumsub via x402)",
+                  label: "Run KYB Verification (Sumsub + x402)",
                   detail: "Calling KYB provider with x402 payment...",
                 });
               }
@@ -308,7 +308,7 @@ export async function POST(req: NextRequest) {
               send("step", {
                 id: "doc-resolve",
                 status: "complete",
-                label: "Resolving + Verifying Document Bundle",
+                label: "Resolve & Verify Document Bundle",
                 detail: `Extraction complete: ${String(extracted.companyName || "company")} (${String(extracted.country || "country")})`,
                 data: {
                   ...extracted,
@@ -321,7 +321,7 @@ export async function POST(req: NextRequest) {
                 send("step", {
                   id: "kyb",
                   status: "running",
-                  label: "KYB Verification (Sumsub via x402)",
+                  label: "Run KYB Verification (Sumsub + x402)",
                   detail: "Calling KYB provider with x402 payment...",
                 });
               }
@@ -337,7 +337,7 @@ export async function POST(req: NextRequest) {
               send("step", {
                 id: "kyb",
                 status: "complete",
-                label: "KYB Verification (Sumsub via x402)",
+                label: "Run KYB Verification (Sumsub + x402)",
                 detail: `Status: ${kybStatus} · Provider Score: ${kybScore}/1000`,
                 data: {
                   providerStatus: kybStatus,
@@ -360,7 +360,7 @@ export async function POST(req: NextRequest) {
               send("step", {
                 id: "gemini",
                 status: "running",
-                label: "AI Risk Assessment (Gemini)",
+                label: "Run AI Risk Scoring (Gemini)",
                 detail: `Model: ${modelMatch?.[1] || "gemini-2.5-flash"} · Analyzing KYB + document data...`,
               });
             }
@@ -376,7 +376,7 @@ export async function POST(req: NextRequest) {
               send("step", {
                 id: "gemini",
                 status: "complete",
-                label: "AI Risk Assessment (Gemini)",
+                label: "Run AI Risk Scoring (Gemini)",
                 detail: `Gemini: approved=${approvedMatch?.[1]} · riskScore=${scoreMatch?.[1]}/1000`,
                 data: {
                   geminiApproved: approvedMatch?.[1] === "true",
@@ -400,7 +400,7 @@ export async function POST(req: NextRequest) {
               send("step", {
                 id: "decision",
                 status: "complete",
-                label: "Final Decision",
+                label: "Merge Final Decision",
                 detail: `Approved: ${approvedMatch?.[1]} · Risk Score: ${scoreMatch?.[1]}/1000`,
                 data: {
                   approved: approvedMatch?.[1] === "true",
@@ -410,7 +410,7 @@ export async function POST(req: NextRequest) {
               send("step", {
                 id: "write-report",
                 status: "running",
-                label: "Writing Report On-Chain",
+                label: "Encode Workflow Report",
                 detail: "Encoding report and calling RWAComplianceReceiver...",
               });
             }
@@ -419,7 +419,7 @@ export async function POST(req: NextRequest) {
               send("step", {
                 id: "write-report",
                 status: "complete",
-                label: "Writing Report On-Chain",
+                label: "Encode Workflow Report",
                 detail: `CRE simulator report write complete (${IS_LOCAL ? "local" : "testnet"} mode)`,
               });
             }
@@ -474,7 +474,7 @@ export async function POST(req: NextRequest) {
           send("step", {
             id: "cre-init",
             status: "error",
-            label: "CRE Workflow Engine",
+            label: "Initialize CRE Simulation",
             detail: `CRE exited with code ${result.exitCode}`,
           });
           send("error", { message: "CRE workflow failed. Check raw logs." });
@@ -527,7 +527,7 @@ export async function POST(req: NextRequest) {
         send("step", {
           id: "onchain-write",
           status: "running",
-          label: "Broadcasting On-Chain (onReport)",
+          label: "Broadcast On-Chain (onReport)",
           detail:
             "Calling RWAComplianceReceiver.onReport → ComplianceRegistry + ERC-8004 side effects...",
         });
@@ -597,7 +597,7 @@ export async function POST(req: NextRequest) {
           send("step", {
             id: "onchain-write",
             status: success ? "complete" : "error",
-            label: "Broadcasting On-Chain (onReport)",
+            label: "Broadcast On-Chain (onReport)",
             detail: success
               ? `tx: ${txHash} · ComplianceRegistry updated + ERC-8004 side effects`
               : `tx: ${txHash} · Transaction reverted`,
@@ -680,7 +680,7 @@ export async function POST(req: NextRequest) {
             send("step", {
               id: "onchain-write",
               status: "error",
-              label: "Broadcasting On-Chain",
+              label: "Broadcast On-Chain",
               detail: `onReport failed: ${errMsg.slice(0, 200)}`,
             });
             send("done", { requestId });
@@ -747,7 +747,7 @@ export async function POST(req: NextRequest) {
               id: "onchain-write",
               status:
                 receipt.status === "success" ? "complete" : "error",
-              label: "Broadcasting On-Chain (setApproval fallback)",
+              label: "Broadcast On-Chain (setApproval fallback)",
               detail: `tx: ${txHash} · ComplianceRegistry updated directly`,
               data: { txHash, blockNumber: Number(receipt.blockNumber) },
             });
@@ -759,7 +759,7 @@ export async function POST(req: NextRequest) {
             send("step", {
               id: "onchain-write",
               status: "error",
-              label: "Broadcasting On-Chain",
+              label: "Broadcast On-Chain",
               detail: `Both onReport and setApproval failed: ${fallbackMsg.slice(0, 200)}`,
             });
           }

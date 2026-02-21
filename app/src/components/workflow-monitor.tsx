@@ -30,16 +30,16 @@ interface WorkflowMonitorProps {
 
 /* ── Step definitions (pipeline order) ───────────────────────────────── */
 const PIPELINE: { id: string; label: string }[] = [
-  { id: "payload", label: "Preparing Payload" },
-  { id: "timestamp", label: "Syncing Block Timestamp" },
-  { id: "cre-init", label: "CRE Workflow Engine" },
-  { id: "read-request", label: "Reading On-Chain Request" },
-  { id: "doc-resolve", label: "Resolving + Verifying Document Bundle" },
-  { id: "kyb", label: "KYB Verification (Sumsub via x402)" },
-  { id: "gemini", label: "AI Risk Assessment (Gemini)" },
-  { id: "decision", label: "Final Decision" },
-  { id: "write-report", label: "Writing Report (CRE Simulator)" },
-  { id: "onchain-write", label: "Broadcasting On-Chain (onReport)" },
+  { id: "payload", label: "Build Trigger Payload" },
+  { id: "timestamp", label: "Synchronize Chain Timestamp" },
+  { id: "cre-init", label: "Initialize CRE Simulation" },
+  { id: "read-request", label: "Read On-Chain Request" },
+  { id: "doc-resolve", label: "Resolve & Verify Document Bundle" },
+  { id: "kyb", label: "Run KYB Verification (Sumsub + x402)" },
+  { id: "gemini", label: "Run AI Risk Scoring (Gemini)" },
+  { id: "decision", label: "Merge Final Decision" },
+  { id: "write-report", label: "Encode Workflow Report" },
+  { id: "onchain-write", label: "Broadcast On-Chain (onReport)" },
   { id: "side-effects", label: "On-Chain Side Effects" },
 ];
 
@@ -168,7 +168,7 @@ export function WorkflowMonitor({
             CRE Workflow — Request #{requestId}
           </h2>
           <p className="text-xs text-muted mt-0.5">
-            Chainlink CRE off-chain computation → Sumsub KYB → Gemini AI → on-chain write
+            Chainlink CRE execution: on-chain read → document verify → KYB + AI → on-chain report
           </p>
         </div>
         <div className="flex gap-2">
