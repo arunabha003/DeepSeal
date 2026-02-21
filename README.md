@@ -55,7 +55,7 @@ The contracts are already deployed on **Base Sepolia** at the addresses above. F
 - [Chainlink CRE CLI](https://docs.chain.link/cre) (`cre` binary in PATH)
 - [Foundry](https://book.getfoundry.sh/getting-started/installation) (only needed if you want to submit requests via CLI)
 - Gemini API key (free from [aistudio.google.com](https://aistudio.google.com))
-- Sumsub sandbox keys (or use `FORCE_APPROVE=true` for demos) — see [Sumsub Setup](docs/sumsub-setup.md)
+- Sumsub sandbox keys (or use `FORCE_APPROVE=true` for demos)
 
 ### 1. Clone & Install
 
@@ -95,6 +95,26 @@ cp app/.env.local.example app/.env.local
 Edit each file and fill in your API keys and private keys. The `.example` files contain testnet addresses pre-filled — you only need to add secrets.
 
 > ⚠️ Never commit `.env` files. They are all gitignored.
+
+### 2.1 Sumsub keys and quick verification
+
+Set these in `services/kyb-provider/.env`:
+- `SUMSUB_APP_TOKEN`
+- `SUMSUB_SECRET_KEY`
+- `SUMSUB_LEVEL_NAME` (business verification level)
+
+Then validate auth:
+
+```bash
+# with server running
+curl -s http://127.0.0.1:3001/sumsub/healthz | jq
+
+# without starting the server
+cd services/kyb-provider
+npm run check:sumsub
+```
+
+Expected: `authValid: true`. If `false` with `401/403`, token/secret/signature inputs are incorrect.
 
 ### 3. Start Services
 
