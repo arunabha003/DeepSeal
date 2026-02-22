@@ -576,12 +576,21 @@ export async function POST(req: NextRequest) {
           const headerTxHash = extractX402TxHash(simResult.x402PaymentResponseHeader);
           const finalX402TxHash = directTxHash || headerTxHash || "";
           if (finalX402TxHash) {
+            const providerStatus =
+              (typeof simResult.providerStatus === "string" && simResult.providerStatus) ||
+              "UNKNOWN";
+            const providerScore =
+              typeof simResult.providerScore === "number"
+                ? simResult.providerScore
+                : 0;
             send("step", {
               id: "kyb",
               status: "complete",
               label: "Run KYB Verification (Sumsub + x402)",
-              detail: `x402 payment settled · tx: ${finalX402TxHash.slice(0, 10)}...${finalX402TxHash.slice(-8)}`,
+              detail: `Status: ${providerStatus} · Provider Score: ${providerScore}/1000 · x402 payment settled · tx: ${finalX402TxHash.slice(0, 10)}...${finalX402TxHash.slice(-8)}`,
               data: {
+                providerStatus,
+                providerScore,
                 x402Payment: true,
                 x402Amount: "0.01",
                 x402Asset: "USDC",

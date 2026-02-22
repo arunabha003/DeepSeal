@@ -318,6 +318,10 @@ export function WorkflowMonitor({
                   {/* KYB data card */}
                   {step?.data && p.id === "kyb" && (
                     <div className="mt-2 space-y-2">
+                      {(() => {
+                        const providerStatus = String(step.data.providerStatus ?? "UNKNOWN");
+                        const providerScore = Number(step.data.providerScore ?? 0);
+                        return (
                       <div className="p-2.5 rounded bg-surface-2/50 border border-surface-3/50 grid grid-cols-3 gap-3 text-[11px]">
                         <div>
                           <span className="text-muted block">Provider</span>
@@ -328,21 +332,25 @@ export function WorkflowMonitor({
                           <span
                             className={cn(
                               "font-mono font-bold",
-                              step.data.providerStatus === "APPROVED"
+                              providerStatus === "APPROVED"
                                 ? "text-success"
-                                : "text-danger"
+                                : providerStatus === "REJECTED"
+                                  ? "text-danger"
+                                  : "text-zinc-300"
                             )}
                           >
-                            {String(step.data.providerStatus)}
+                            {providerStatus}
                           </span>
                         </div>
                         <div>
                           <span className="text-muted block">Provider Score</span>
                           <span className="font-mono text-white">
-                            {String(step.data.providerScore)} / 1000
+                            {providerScore} / 1000
                           </span>
                         </div>
                       </div>
+                        );
+                      })()}
 
                       {/* x402 Payment Details */}
                       {Boolean(step.data.x402Payment) && (
