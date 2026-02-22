@@ -1,145 +1,160 @@
 # DeepSeal
 
+<p align="center">
+  <strong>Confidential RWA Due-Diligence Vault</strong><br/>
+  Chainlink CRE · x402 · EAS · ERC-8004 · ERC-4626
+</p>
 
+<p align="center">
+  <a href="https://github.com/arunabha003/Chainlink-Convergence"><img src="https://img.shields.io/badge/GitHub-Repository-181717?logo=github" /></a>
+  <img src="https://img.shields.io/badge/Chain-Base%20Sepolia-0052FF?logo=coinbase" />
+  <img src="https://img.shields.io/badge/Workflow-Chainlink%20CRE-375BD2" />
+  <img src="https://img.shields.io/badge/Compliance-EAS%20%2B%20ERC--8004-0EA5E9" />
+  <img src="https://img.shields.io/badge/Payments-x402%20(USDC)-16A34A" />
+</p>
 
-DeepSeal is a compliance-gated **ERC-4626 vault** for Real World Assets, where access is controlled by an automated due-diligence pipeline that orchestrates **KYB verification** (Sumsub via x402 micropayments), **AI risk scoring** (Google Gemini), **on-chain attestations** (EAS), and **agent reputation tracking** (ERC-8004) — all powered by a single **Chainlink CRE workflow**.
+<p align="center">
+  <a href="#overview">Overview</a> ·
+  <a href="#protocol-architecture">Architecture</a> ·
+  <a href="#live-deployment-base-sepolia">Live Addresses</a> ·
+  <a href="#quick-start-using-deployed-contracts">Quick Start</a> ·
+  <a href="#chainlink-cre-files">CRE Files</a>
+</p>
 
-One CRE workflow execution reads an on-chain request, resolves an IPFS document bundle, verifies the company via KYB, scores risk with Gemini AI, and writes the result on-chain — triggering a cascade of **9 events** across 5 contracts in a single transaction: compliance approval, EAS attestation, and ERC-8004 agent reputation + validation artifacts.
+---
+
+## Overview
+
+DeepSeal is a compliance-gated **ERC-4626 vault** for Real World Assets where access is controlled by one **Chainlink CRE** workflow.
+
+Each workflow run:
+1. reads an on-chain diligence request,
+2. resolves and verifies an IPFS document bundle,
+3. runs KYB verification (Sumsub via x402 rails),
+4. runs AI risk scoring (Gemini),
+5. writes a single canonical report on-chain.
+
+That one on-chain report triggers **9 events across 5 contracts**: compliance state update, EAS attestation, and ERC-8004 reputation/validation side effects.
+
+---
+
+## Protocol Architecture
 
 ![Protocol Architecture](docs/protocol-diagram.png)
 
-Implementation details: [`docs/implementation.md`](docs/implementation.md)  
-Visual diagram: [`docs/protocol-diagram.png`](docs/protocol-diagram.png)
+- Detailed implementation: [`docs/implementation.md`](docs/implementation.md)
+- Diagram source/details: [`docs/protocol-diagram.png`](docs/protocol-diagram.png)
 
 ---
 
-## Key Components
+## Documentation Index
 
-| Feature | What It Does |
-|---------|-------------|
-| **Chainlink CRE** | Off-chain orchestration engine — a single TypeScript workflow reads on-chain requests, calls external APIs, scores risk, and writes the compliance result back on-chain via `EVMClient.writeReport()` |
-| **x402 Micropayments** | KYB verification is paywalled with the x402 HTTP payment protocol — CRE workflow pays 0.01 USDC per call using EIP-3009 `transferWithAuthorization` (402 → sign → retry) |
-| **EAS Attestations** | Every compliance decision is attested on-chain via the Ethereum Attestation Service (Base Sepolia native) — immutable, verifiable proof of due-diligence |
-| **ERC-8004 Agent Trust** | Two NFT-based agent identities (Agents #916 & #917) with reputation feedback scores (0-100) and validation request/response records on official ERC-8004 registries |
-| **Google Gemini AI** | Structured risk scoring — company context + KYB data fed to Gemini 2.5 Flash → `{ approved, riskScore: 0-1000, reasons[] }` with automatic model fallback |
-| **IPFS / Pinata** | Company document bundles stored on IPFS, referenced by `metadataUri` in on-chain requests — CRE workflow resolves and verifies with deterministic `sourceHash` + `extractionHash` |
-| **ERC-4626 Compliance Vault** | Yield vault where deposits require `ComplianceRegistry.isApproved()` — no admin keys, fully on-chain access control driven by CRE workflow output |
-| **Real-Time Frontend** | Next.js 14 app with SSE streaming of CRE workflow execution — 6 pages covering submit, process, compliance lookup, vault operations, and ERC-8004 agent browsing |
+- Full implementation: [`docs/implementation.md`](docs/implementation.md)
+- Base Sepolia deployment guide: [`docs/base-sepolia-deployment.md`](docs/base-sepolia-deployment.md)
+- Anvil + Base Sepolia fork E2E guide: [`docs/anvil-base-sepolia-e2e.md`](docs/anvil-base-sepolia-e2e.md)
+- Protocol architecture diagram: [`docs/protocol-diagram.png`](docs/protocol-diagram.png)
+- Pitch deck slides: [`docs/Deck/`](docs/Deck/)
+- Sample company bundle payload: [`docs/acme-company-bundle.upload.json`](docs/acme-company-bundle.upload.json)
 
 ---
 
-## Live Deployed Addresses (Base Sepolia)
+## Core Components
+
+| Layer | Component | What it does |
+|---|---|---|
+| Orchestration | **Chainlink CRE** | Runs the end-to-end due-diligence workflow and writes the final report on-chain via `EVMClient.writeReport()`. |
+| Payment Rail | **x402** | Handles KYB endpoint micropayments (402 challenge → signed USDC transfer auth → retry). |
+| Verification | **Sumsub (KYB)** | Returns business verification outcome and provider risk signal. |
+| Risk Engine | **Google Gemini** | Produces structured `{ approved, riskScore, reasons[] }` output from extracted company context. |
+| Attestation | **EAS** | Stores immutable on-chain compliance proof for each finalized decision. |
+| Agent Trust | **ERC-8004** | Tracks agent identity + reputation + validation artifacts (Agents `#916`, `#917`). |
+| Storage | **IPFS / Pinata** | Stores diligence bundles referenced by `metadataUri`; CRE verifies deterministic hashes. |
+| Vault | **ERC-4626 RWAVault** | Enforces compliance-gated deposits using `ComplianceRegistry.isApproved()`. |
+| UI | **Next.js Frontend** | Real-time SSE pipeline monitoring + request, process, vault, compliance, and agent views. |
+
+---
+
+## Live Deployment (Base Sepolia)
 
 | Contract | Address |
-|----------|---------|
-| **DemoUSD** | [`0x523E3033F844B1E2175183846ADFD7190EDECD4a`](https://sepolia.basescan.org/address/0x523E3033F844B1E2175183846ADFD7190EDECD4a) |
-| **ComplianceRegistry** | [`0x78383225EA842251361CE7104456322d4d151D66`](https://sepolia.basescan.org/address/0x78383225EA842251361CE7104456322d4d151D66) |
-| **DiligencePortal** | [`0xa5A29714cb9c51A10a165cBe2025372640abb9e5`](https://sepolia.basescan.org/address/0xa5A29714cb9c51A10a165cBe2025372640abb9e5) |
-| **RWAComplianceReceiver** | [`0x16b1D017F22F2aB47bA3eA1948ff973A024CCB4F`](https://sepolia.basescan.org/address/0x16b1D017F22F2aB47bA3eA1948ff973A024CCB4F) |
-| **RWAVault** | [`0x65054D2De227b7e823a0c13fc0C5D6c62198963d`](https://sepolia.basescan.org/address/0x65054D2De227b7e823a0c13fc0C5D6c62198963d) |
-| **ValidationRegistry** | [`0xa30004dfA091b5bD9B019Fa31b490847929555EC`](https://sepolia.basescan.org/address/0xa30004dfA091b5bD9B019Fa31b490847929555EC) |
-| **IdentityRegistry** *(official ERC-8004)* | [`0x8004A818BFB912233c491871b3d84c89A494BD9e`](https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) |
-| **ReputationRegistry** *(official ERC-8004)* | [`0x8004B663056A597Dffe9eCcC1965A193B7388713`](https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713) |
-| **EAS Contract** *(Base Sepolia native)* | [`0x4200000000000000000000000000000000000021`](https://sepolia.basescan.org/address/0x4200000000000000000000000000000000000021) |
-| **EAS Schema Registry** | [`0x4200000000000000000000000000000000000020`](https://sepolia.basescan.org/address/0x4200000000000000000000000000000000000020) |
+|---|---|
+| DemoUSD | [`0x523E3033F844B1E2175183846ADFD7190EDECD4a`](https://sepolia.basescan.org/address/0x523E3033F844B1E2175183846ADFD7190EDECD4a) |
+| ComplianceRegistry | [`0x78383225EA842251361CE7104456322d4d151D66`](https://sepolia.basescan.org/address/0x78383225EA842251361CE7104456322d4d151D66) |
+| DiligencePortal | [`0xa5A29714cb9c51A10a165cBe2025372640abb9e5`](https://sepolia.basescan.org/address/0xa5A29714cb9c51A10a165cBe2025372640abb9e5) |
+| RWAComplianceReceiver | [`0x16b1D017F22F2aB47bA3eA1948ff973A024CCB4F`](https://sepolia.basescan.org/address/0x16b1D017F22F2aB47bA3eA1948ff973A024CCB4F) |
+| RWAVault | [`0x65054D2De227b7e823a0c13fc0C5D6c62198963d`](https://sepolia.basescan.org/address/0x65054D2De227b7e823a0c13fc0C5D6c62198963d) |
+| ValidationRegistry | [`0xa30004dfA091b5bD9B019Fa31b490847929555EC`](https://sepolia.basescan.org/address/0xa30004dfA091b5bD9B019Fa31b490847929555EC) |
+| IdentityRegistry *(official ERC-8004)* | [`0x8004A818BFB912233c491871b3d84c89A494BD9e`](https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) |
+| ReputationRegistry *(official ERC-8004)* | [`0x8004B663056A597Dffe9eCcC1965A193B7388713`](https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713) |
+| EAS Contract *(Base native)* | [`0x4200000000000000000000000000000000000021`](https://sepolia.basescan.org/address/0x4200000000000000000000000000000000000021) |
+| EAS Schema Registry | [`0x4200000000000000000000000000000000000020`](https://sepolia.basescan.org/address/0x4200000000000000000000000000000000000020) |
 
-**ERC-8004 Agents:** [#916 Reputation](https://testnet.8004scan.io/agents/base-sepolia/916), [#917 Validation](https://testnet.8004scan.io/agents/base-sepolia/917) · [Browse all](https://testnet.8004scan.io/agents/base-sepolia)  
-**EAS Schema UID:** `0x91f39675fa85b9340ba36983e388a4b9238c55ac7f593f2c87ba0c55115dd06a`
+- ERC-8004 agents: [#916 Reputation](https://testnet.8004scan.io/agents/base-sepolia/916), [#917 Validation](https://testnet.8004scan.io/agents/base-sepolia/917), [Browse all](https://testnet.8004scan.io/agents/base-sepolia)
+- EAS schema UID: `0x91f39675fa85b9340ba36983e388a4b9238c55ac7f593f2c87ba0c55115dd06a`
 
 ---
 
-## How to Run (Using Deployed Contracts)
-
-The contracts are already deployed on **Base Sepolia** at the addresses above. Follow these steps to run the full pipeline locally.
+## Quick Start (Using Deployed Contracts)
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) ≥ 18
-- [Chainlink CRE CLI](https://docs.chain.link/cre) (`cre` binary in PATH)
-- [Foundry](https://book.getfoundry.sh/getting-started/installation) (only needed if you want to submit requests via CLI)
-- Gemini API key (free from [aistudio.google.com](https://aistudio.google.com))
-- Sumsub sandbox keys (or use `FORCE_APPROVE=true` for demos)
+- Node.js `>=18`
+- Chainlink CRE CLI (`cre`) in PATH
+- Foundry (optional, for CLI request submission)
+- Gemini API key
+- Sumsub sandbox keys (or `FORCE_APPROVE=true` for demos)
 
-### 1. Clone & Install
+### 1) Clone + Install
 
 ```bash
 git clone https://github.com/arunabha003/Chainlink-Convergence.git
 cd Chainlink-Convergence
 
-# Install frontend
 cd app && npm install && cd ..
-
-# Install KYB provider
 cd services/kyb-provider && npm install && cd ../..
 ```
 
-### 2. Configure Secrets
-
-Copy the `.example` files and fill in your secrets:
+### 2) Configure env files
 
 ```bash
-# Root environment (for Foundry scripts / tools)
 cp .env.example .env
-
-# KYB provider
 cp services/kyb-provider/.env.example services/kyb-provider/.env
-
-# CRE workflow
 cp cre/chainlink-Convergence/.env.example cre/chainlink-Convergence/.env
-
-# CRE workflow config (staging — already has testnet addresses)
-cp cre/chainlink-Convergence/my-workflow/config.staging.example.json \
-   cre/chainlink-Convergence/my-workflow/config.staging.json
-
-# Frontend
+cp cre/chainlink-Convergence/my-workflow/config.staging.example.json cre/chainlink-Convergence/my-workflow/config.staging.json
 cp app/.env.local.example app/.env.local
 ```
 
-Edit each file and fill in your API keys and private keys. The `.example` files contain testnet addresses pre-filled — you only need to add secrets.
+Fill secrets in those copied files (`.env`, `services/kyb-provider/.env`, `cre/.../.env`, `app/.env.local`).
 
-> Never commit `.env` files. They are all gitignored.
-
-### 2.1 Sumsub keys and quick verification
-
-Set these in `services/kyb-provider/.env`:
-- `SUMSUB_APP_TOKEN`
-- `SUMSUB_SECRET_KEY`
-- `SUMSUB_LEVEL_NAME` (business verification level)
-
-Then validate auth:
+### 3) Optional Sumsub sanity checks
 
 ```bash
-# with server running
 curl -s http://127.0.0.1:3001/sumsub/healthz | jq
 
-# without starting the server
 cd services/kyb-provider
 npm run check:sumsub
 ```
 
-
-### 3. Start Services
+### 4) Start local services
 
 ```bash
-# Terminal 1: KYB Provider (with x402 paywall)
+# terminal 1
 cd services/kyb-provider && npm start
-# → http://localhost:3001
 
-# Terminal 2: Frontend
+# terminal 2
 cd app && npm run dev
-# → http://localhost:3000
 ```
 
-### 4. Use the Pipeline
+### 5) Run full flow from UI
 
-1. Go to **http://localhost:3000/submit** — submit a diligence request (subject address + IPFS doc bundle)
-2. Go to **http://localhost:3000/process** — select the request and click "Run CRE Workflow"
-3. Watch the 10-step pipeline execute in real-time via SSE streaming
-4. Check **http://localhost:3000/compliance** — verify the address is approved
-5. Go to **http://localhost:3000/vault** — deposit into the compliance-gated vault
-6. Check **http://localhost:3000/agents** — view ERC-8004 agent reputation scores
+1. Open `http://localhost:3000/submit` and create request.
+2. Open `http://localhost:3000/process` and run CRE workflow.
+3. Watch live SSE steps for KYB, AI scoring, and on-chain write.
+4. Validate output in `http://localhost:3000/compliance`.
+5. Test vault behavior in `http://localhost:3000/vault`.
+6. Inspect agents in `http://localhost:3000/agents`.
 
-### Alternative: Run CRE Simulation via CLI
+### 6) Run CRE simulation directly (CLI)
 
 ```bash
 cd cre/chainlink-Convergence
@@ -152,84 +167,43 @@ cre workflow simulate ./my-workflow \
   -e .env
 ```
 
-> For full deployment from scratch or Anvil fork testing, see [docs/base-sepolia-deployment.md](docs/base-sepolia-deployment.md) and [docs/anvil-base-sepolia-e2e.md](docs/anvil-base-sepolia-e2e.md).
+For full deployment and anvil fork flow:
+- [`docs/base-sepolia-deployment.md`](docs/base-sepolia-deployment.md)
+- [`docs/anvil-base-sepolia-e2e.md`](docs/anvil-base-sepolia-e2e.md)
 
 ---
 
 ## Chainlink CRE Files
 
 | File | Description |
-|------|-------------|
-| [`cre/chainlink-Convergence/my-workflow/main.ts`](cre/chainlink-Convergence/my-workflow/main.ts) | **CRE Workflow** — 1081-line TypeScript workflow: HTTP trigger → read on-chain request → resolve IPFS doc → deterministic extraction → KYB (x402) → Gemini AI risk scoring → write compliance report on-chain |
-| [`cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json`](cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json) | CRE config for local Anvil fork simulation |
-| [`cre/chainlink-Convergence/my-workflow/config.staging.json`](cre/chainlink-Convergence/my-workflow/config.staging.json) | CRE config for Base Sepolia staging |
-| [`cre/chainlink-Convergence/project.yaml`](cre/chainlink-Convergence/project.yaml) | CRE project settings — RPC targets for anvil / staging / production |
-| [`cre/chainlink-Convergence/secrets.yaml`](cre/chainlink-Convergence/secrets.yaml) | CRE secrets configuration |
-| [`cre/README.md`](cre/README.md) | CRE workflow setup and simulation instructions |
-| [`src/RWAComplianceReceiver.sol`](src/RWAComplianceReceiver.sol) | On-chain CRE report receiver — validates workflow identity, updates compliance, triggers EAS + ERC-8004 |
-| [`src/ComplianceRegistry.sol`](src/ComplianceRegistry.sol) | Compliance state store — written by CRE workflow via receiver, read by vault |
-| [`src/RWAVault.sol`](src/RWAVault.sol) | ERC-4626 vault with compliance gate — deposits require `isApproved()` |
-| [`services/kyb-provider/src/server.mjs`](services/kyb-provider/src/server.mjs) | KYB microservice (Sumsub + x402 paywall) — called by CRE workflow via HTTPClient |
-| [`app/src/app/api/workflow/run/route.ts`](app/src/app/api/workflow/run/route.ts) | Next.js SSE API route — spawns CRE CLI, streams steps to browser, writes on-chain |
+|---|---|
+| [`cre/chainlink-Convergence/my-workflow/main.ts`](cre/chainlink-Convergence/my-workflow/main.ts) | Main CRE workflow (trigger → on-chain read → bundle resolve/verify → KYB/x402 → Gemini → on-chain report). |
+| [`cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json`](cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json) | Local Anvil fork config. |
+| [`cre/chainlink-Convergence/my-workflow/config.staging.json`](cre/chainlink-Convergence/my-workflow/config.staging.json) | Base Sepolia staging config. |
+| [`cre/chainlink-Convergence/project.yaml`](cre/chainlink-Convergence/project.yaml) | CRE project targets and RPC profiles. |
+| [`cre/chainlink-Convergence/secrets.yaml`](cre/chainlink-Convergence/secrets.yaml) | CRE secret map template. |
+| [`cre/README.md`](cre/README.md) | CRE-specific runbook and commands. |
+| [`src/RWAComplianceReceiver.sol`](src/RWAComplianceReceiver.sol) | On-chain receiver for CRE reports; applies compliance/EAS/ERC-8004 effects. |
+| [`services/kyb-provider/src/server.mjs`](services/kyb-provider/src/server.mjs) | KYB provider wrapper (Sumsub + x402 behavior). |
+| [`app/src/app/api/workflow/run/route.ts`](app/src/app/api/workflow/run/route.ts) | SSE endpoint that runs CRE simulation and streams pipeline status. |
 
 ---
 
-## How CRE Is Used
+## How CRE is used in DeepSeal
 
-### The Problem
+CRE is the deterministic execution layer between off-chain evidence and on-chain policy:
 
-Compliance verification for RWAs requires multiple off-chain data sources (KYB providers, AI risk models, document verification) combined with on-chain state management. This needs to be:
-- **Deterministic** — same inputs → same compliance decision
-- **Verifiable** — results can be attested and audited
-- **Trustless** — no single party controls the outcome
-
-### CRE as the Orchestration Layer
-
-The **Chainlink CRE workflow** (`main.ts`, 1081 lines) is the brain of the protocol. It runs as a TypeScript program in Chainlink's decentralized compute nodes, orchestrating the entire pipeline:
-
-```
-HTTP Trigger (requestId)
-    │
-    ▼
-EVMClient.read() ──► DiligencePortal.getRequest(requestId)
-    │                  (on-chain request: subject, docBundleHash, metadataUri)
-    ▼
-HTTPClient ──► Resolve IPFS Document (Pinata)
-    │           Extract company info + compute provenance hashes
-    ▼
-HTTPClient ──► KYB Provider (POST /kyb/free)
-    │           Sumsub verification with x402 micropayment rail
-    │           Returns: providerStatus, providerScore
-    ▼
-HTTPClient ──► Google Gemini AI (structured JSON)
-    │           Risk scoring with company context + KYB data
-    │           Returns: { approved, riskScore: 0-1000, reasons[] }
-    ▼
-Merge Decision ──► KYB ∧ AI both must approve
-    │               riskScore = weighted average
-    ▼
-EVMClient.writeReport() ──► RWAComplianceReceiver.onReport()
-                             9 events: compliance + EAS + ERC-8004
-```
-
-### CRE SDK Features Used
-
-| SDK Feature | How We Use It |
-|-------------|---------------|
-| **`EVMClient`** | Read diligence requests from DiligencePortal, write compliance reports to RWAComplianceReceiver |
-| **`HTTPClient`** | Call KYB Provider (Sumsub), Google Gemini API, IPFS resolver |
-| **`ConfidentialHTTPClient`** | Secret-aware HTTP for x402 payments in production (signed USDC transfers) |
-| **`ConsensusAggregationByFields`** | DON consensus — `identical` for approval, `median` for riskScore |
-| **`handler` + `Runner`** | Workflow lifecycle — trigger parsing, step execution, result encoding |
-| **`runtime.getSecret()`** | CRE secrets manager for API keys (Gemini, Sumsub) |
-| **`runtime.log()`** | Observable logging — each step logs progress, parsed by frontend SSE for real-time visualization |
-| **`encodeCallMsg` + `encodeAbiParameters`** | ABI encoding for on-chain reads/writes |
-| **`getNetwork()`** | Chain selector resolution for EVMClient targets |
+1. Trigger starts with `requestId`.
+2. Workflow reads request from `DiligencePortal`.
+3. Workflow resolves + verifies document bundle.
+4. Workflow executes KYB call (paid x402 path when enabled).
+5. Workflow computes AI risk output (Gemini structured JSON).
+6. Workflow merges outputs under policy constraints.
+7. Workflow writes canonical report to `RWAComplianceReceiver`.
+8. Receiver applies atomic on-chain side effects.
 
 ---
 
-
-
-## 📄 License
+## License
 
 MIT
