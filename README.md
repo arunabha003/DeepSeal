@@ -25,16 +25,9 @@
 
 ## Overview
 
-DeepSeal is a compliance-gated **ERC-4626 vault** for Real World Assets where access is controlled by one **Chainlink CRE** workflow.
+DeepSeal is a compliance-gated ERC-4626 vault for Real World Assets, where access is controlled by an automated due-diligence pipeline that orchestrates KYB verification (Sumsub via x402 micropayments), AI risk scoring (Google Gemini), on-chain attestations (EAS), and agent reputation tracking (ERC-8004) — all powered by a single Chainlink CRE workflow.
 
-Each workflow run:
-1. reads an on-chain diligence request,
-2. resolves and verifies an IPFS document bundle,
-3. runs KYB verification (Sumsub via x402 rails),
-4. runs AI risk scoring (Gemini),
-5. writes a single canonical report on-chain.
-
-That one on-chain report triggers **9 events across 5 contracts**: compliance state update, EAS attestation, and ERC-8004 reputation/validation side effects.
+One CRE workflow execution reads an on-chain request, resolves an IPFS document bundle, verifies the company via KYB, scores risk with Gemini AI, and writes the result on-chain — triggering a cascade of 9 events across 5 contracts in a single transaction: compliance approval, EAS attestation, and ERC-8004 agent reputation + validation artifacts.
 
 ---
 
@@ -42,8 +35,6 @@ That one on-chain report triggers **9 events across 5 contracts**: compliance st
 
 ![Protocol Architecture](docs/protocol-diagram.png)
 
-- Detailed implementation: [`docs/implementation.md`](docs/implementation.md)
-- Diagram source/details: [`docs/protocol-diagram.png`](docs/protocol-diagram.png)
 
 ---
 
@@ -91,6 +82,37 @@ That one on-chain report triggers **9 events across 5 contracts**: compliance st
 
 - ERC-8004 agents: [#916 Reputation](https://testnet.8004scan.io/agents/base-sepolia/916), [#917 Validation](https://testnet.8004scan.io/agents/base-sepolia/917), [Browse all](https://testnet.8004scan.io/agents/base-sepolia)
 - EAS schema UID: `0x91f39675fa85b9340ba36983e388a4b9238c55ac7f593f2c87ba0c55115dd06a`
+
+---
+
+## Chainlink CRE Files
+
+| File | Description |
+|---|---|
+| [`cre/chainlink-Convergence/my-workflow/main.ts`](cre/chainlink-Convergence/my-workflow/main.ts) | Main CRE workflow (trigger → on-chain read → bundle resolve/verify → KYB/x402 → Gemini → on-chain report). |
+| [`cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json`](cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json) | Local Anvil fork config. |
+| [`cre/chainlink-Convergence/my-workflow/config.staging.json`](cre/chainlink-Convergence/my-workflow/config.staging.json) | Base Sepolia staging config. |
+| [`cre/chainlink-Convergence/project.yaml`](cre/chainlink-Convergence/project.yaml) | CRE project targets and RPC profiles. |
+| [`cre/chainlink-Convergence/secrets.yaml`](cre/chainlink-Convergence/secrets.yaml) | CRE secret map template. |
+| [`cre/README.md`](cre/README.md) | CRE-specific runbook and commands. |
+| [`src/RWAComplianceReceiver.sol`](src/RWAComplianceReceiver.sol) | On-chain receiver for CRE reports; applies compliance/EAS/ERC-8004 effects. |
+| [`services/kyb-provider/src/server.mjs`](services/kyb-provider/src/server.mjs) | KYB provider wrapper (Sumsub + x402 behavior). |
+| [`app/src/app/api/workflow/run/route.ts`](app/src/app/api/workflow/run/route.ts) | SSE endpoint that runs CRE simulation and streams pipeline status. |
+
+---
+
+## How CRE is used in DeepSeal
+
+CRE is the deterministic execution layer between off-chain evidence and on-chain policy:
+
+1. Trigger starts with `requestId`.
+2. Workflow reads request from `DiligencePortal`.
+3. Workflow resolves + verifies document bundle.
+4. Workflow executes KYB call (paid x402 path when enabled).
+5. Workflow computes AI risk output (Gemini structured JSON).
+6. Workflow merges outputs under policy constraints.
+7. Workflow writes canonical report to `RWAComplianceReceiver`.
+8. Receiver applies atomic on-chain side effects.
 
 ---
 
@@ -173,36 +195,7 @@ For full deployment and anvil fork flow:
 
 ---
 
-## Chainlink CRE Files
 
-| File | Description |
-|---|---|
-| [`cre/chainlink-Convergence/my-workflow/main.ts`](cre/chainlink-Convergence/my-workflow/main.ts) | Main CRE workflow (trigger → on-chain read → bundle resolve/verify → KYB/x402 → Gemini → on-chain report). |
-| [`cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json`](cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json) | Local Anvil fork config. |
-| [`cre/chainlink-Convergence/my-workflow/config.staging.json`](cre/chainlink-Convergence/my-workflow/config.staging.json) | Base Sepolia staging config. |
-| [`cre/chainlink-Convergence/project.yaml`](cre/chainlink-Convergence/project.yaml) | CRE project targets and RPC profiles. |
-| [`cre/chainlink-Convergence/secrets.yaml`](cre/chainlink-Convergence/secrets.yaml) | CRE secret map template. |
-| [`cre/README.md`](cre/README.md) | CRE-specific runbook and commands. |
-| [`src/RWAComplianceReceiver.sol`](src/RWAComplianceReceiver.sol) | On-chain receiver for CRE reports; applies compliance/EAS/ERC-8004 effects. |
-| [`services/kyb-provider/src/server.mjs`](services/kyb-provider/src/server.mjs) | KYB provider wrapper (Sumsub + x402 behavior). |
-| [`app/src/app/api/workflow/run/route.ts`](app/src/app/api/workflow/run/route.ts) | SSE endpoint that runs CRE simulation and streams pipeline status. |
-
----
-
-## How CRE is used in DeepSeal
-
-CRE is the deterministic execution layer between off-chain evidence and on-chain policy:
-
-1. Trigger starts with `requestId`.
-2. Workflow reads request from `DiligencePortal`.
-3. Workflow resolves + verifies document bundle.
-4. Workflow executes KYB call (paid x402 path when enabled).
-5. Workflow computes AI risk output (Gemini structured JSON).
-6. Workflow merges outputs under policy constraints.
-7. Workflow writes canonical report to `RWAComplianceReceiver`.
-8. Receiver applies atomic on-chain side effects.
-
----
 
 ## License
 
