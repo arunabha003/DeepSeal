@@ -159,9 +159,11 @@ Current runtime path:
 2. Read request from `DiligencePortal`.
 3. Resolve and parse metadata/doc bundle.
 4. Run KYB against provider (`/kyb/free` or `/kyb` with x402).
-5. Run Gemini analysis.
-6. Merge decisions and compute final report fields.
-7. Write report to on-chain receiver path.
+5. Run PII redaction (`/pii/redact`) over the Gemini input payload.
+6. Run Gemini analysis on redacted payload.
+7. Merge decisions and compute final report fields.
+8. Write report to on-chain receiver path.
+9. Send confidential audit event (`/audit/webhook`).
 
 When `useConfidentialHttp=true`, document resolution, KYB, and Gemini calls run through `ConfidentialHTTPClient`; otherwise they use standard `HTTPClient`.
 The workflow is observable via `runtime.log()` and exposed to the frontend processing page through streaming output.

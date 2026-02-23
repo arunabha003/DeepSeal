@@ -25,7 +25,7 @@
 
 ## Overview
 
-DeepSeal is a compliance-gated ERC-4626 vault for Real World Assets, where access is controlled by an automated due-diligence pipeline that orchestrates KYB verification (Sumsub via x402 micropayments), AI risk scoring (Google Gemini), on-chain attestations (EAS), and agent reputation tracking (ERC-8004) — all powered by a single Chainlink CRE workflow.
+DeepSeal is a compliance-gated ERC-4626 vault for Real World Assets, where access is controlled by an automated due-diligence pipeline that orchestrates KYB verification (Sumsub via x402 micropayments), confidential PII redaction, AI risk scoring (Google Gemini), on-chain attestations (EAS), and agent reputation tracking (ERC-8004) — all powered by a single Chainlink CRE workflow.
 
 One CRE workflow execution reads an on-chain request, resolves an IPFS document bundle, verifies the company via KYB, scores risk with Gemini AI, and writes the result on-chain — triggering a cascade of 9 events across 5 contracts in a single transaction: compliance approval, EAS attestation, and ERC-8004 agent reputation + validation artifacts.
 
@@ -55,8 +55,10 @@ One CRE workflow execution reads an on-chain request, resolves an IPFS document 
 |---|---|---|
 | Orchestration | **Chainlink CRE** | Runs the end-to-end due-diligence workflow and writes the final report on-chain via `EVMClient.writeReport()`. |
 | Payment Rail | **x402** | Handles KYB endpoint micropayments (402 challenge → signed USDC transfer auth → retry). |
+| Privacy Controls | **Confidential HTTP** | Runs sensitive calls (doc resolve, KYB, PII redaction, Gemini, audit sink) offchain with protected secrets/inputs. |
 | Verification | **Sumsub (KYB)** | Returns business verification outcome and provider risk signal. |
 | Risk Engine | **Google Gemini** | Produces structured `{ approved, riskScore, reasons[] }` output from extracted company context. |
+| Audit Trail (Offchain) | **Confidential Audit Sink** | Receives private completion payloads (`requestId`, hashes, decision, x402 tx hash) for compliance logging. |
 | Attestation | **EAS** | Stores immutable on-chain compliance proof for each finalized decision. |
 | Agent Trust | **ERC-8004** | Tracks agent identity + reputation + validation artifacts (Agents `#916`, `#917`). |
 | Storage | **IPFS / Pinata** | Stores diligence bundles referenced by `metadataUri`; CRE verifies deterministic hashes. |
@@ -96,7 +98,7 @@ One CRE workflow execution reads an on-chain request, resolves an IPFS document 
 | [`cre/chainlink-Convergence/secrets.yaml`](cre/chainlink-Convergence/secrets.yaml) | CRE secret map template. |
 | [`cre/README.md`](cre/README.md) | CRE-specific runbook and commands. |
 | [`src/RWAComplianceReceiver.sol`](src/RWAComplianceReceiver.sol) | On-chain receiver for CRE reports; applies compliance/EAS/ERC-8004 effects. |
-| [`services/kyb-provider/src/server.mjs`](services/kyb-provider/src/server.mjs) | KYB provider wrapper (Sumsub + x402 behavior). |
+| [`services/kyb-provider/src/server.mjs`](services/kyb-provider/src/server.mjs) | Provider service (Sumsub + x402 + `/docs/resolve` + `/pii/redact` + `/audit/webhook`). |
 | [`app/src/app/api/workflow/run/route.ts`](app/src/app/api/workflow/run/route.ts) | SSE endpoint that runs CRE simulation and streams pipeline status. |
 
 ---
@@ -109,10 +111,12 @@ CRE is the deterministic execution layer between off-chain evidence and on-chain
 2. Workflow reads request from `DiligencePortal`.
 3. Workflow resolves + verifies document bundle.
 4. Workflow executes KYB call (paid x402 path when enabled).
-5. Workflow computes AI risk output (Gemini structured JSON).
-6. Workflow merges outputs under policy constraints.
-7. Workflow writes canonical report to `RWAComplianceReceiver`.
-8. Receiver applies atomic on-chain side effects.
+5. Workflow redacts PII via Confidential HTTP before LLM inference.
+6. Workflow computes AI risk output (Gemini structured JSON).
+7. Workflow merges outputs under policy constraints.
+8. Workflow writes canonical report to `RWAComplianceReceiver`.
+9. Workflow sends confidential audit payload to private sink.
+10. Receiver applies atomic on-chain side effects.
 
 ---
 

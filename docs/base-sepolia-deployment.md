@@ -201,9 +201,11 @@ cre workflow simulate ./my-workflow \
 Expected output includes:
 - Document resolver verification (`sourceHash`) + deterministic extraction (`extractionHash`)
 - KYB check via x402 paywall → APPROVED (if `FORCE_APPROVE=true`)
+- PII redaction step via confidential HTTP (`PII redaction completed ... redactionHash=0x...`)
 - x402 settlement trace with a real payment tx hash (`x402 payment settled txHash=0x...`)
 - Gemini LLM risk analysis → risk score
 - On-chain write to ComplianceRegistry via RWAComplianceReceiver
+- Confidential audit sink delivery (`Audit webhook delivered via confidential HTTP ...`)
 - `providerStatus`, `providerScore`, and `x402TxHash` in `Workflow Simulation Result`
 - `txHash: "simulation-no-txhash"` (normal for CRE simulation mode)
 
