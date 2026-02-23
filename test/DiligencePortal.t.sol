@@ -16,11 +16,12 @@ contract DiligencePortalTest is Test {
         address subject = address(0xBEEF);
         bytes32 bundle = keccak256("bundle");
         string memory uri = "ipfs://abc";
+        bytes32 assetId = portal.computeAssetId(address(this), subject, bundle, uri);
 
         vm.warp(456);
 
         vm.expectEmit(true, true, true, true);
-        emit DiligencePortal.DiligenceRequested(1, address(this), subject, bundle, uri, 456);
+        emit DiligencePortal.DiligenceRequested(1, assetId, address(this), subject, bundle, uri, 456);
 
         uint256 id = portal.submit(subject, bundle, uri);
         assertEq(id, 1);
@@ -32,6 +33,7 @@ contract DiligencePortalTest is Test {
         assertEq(req.docBundleHash, bundle);
         assertEq(req.metadataUri, uri);
         assertEq(req.requestedAt, 456);
+        assertEq(portal.assetIdForRequest(id), assetId);
     }
 
     function test_submitZeroSubjectReverts() external {
@@ -44,4 +46,3 @@ contract DiligencePortalTest is Test {
         portal.submit(address(1), bytes32(0), "ipfs://abc");
     }
 }
-

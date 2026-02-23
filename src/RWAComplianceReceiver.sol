@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {ComplianceRegistry} from "./ComplianceRegistry.sol";
 import {IEAS} from "./interfaces/IEAS.sol";
@@ -30,6 +31,38 @@ interface IValidationRegistry {
         external;
 }
 
+interface IDiligencePortal {
+    struct Request {
+        address requester;
+        address subject;
+        bytes32 docBundleHash;
+        string metadataUri;
+        uint64 requestedAt;
+    }
+
+    function getRequest(uint256 requestId) external view returns (Request memory);
+    function assetIdForRequest(uint256 requestId) external view returns (bytes32);
+}
+
+interface IRWAAssetRegistry {
+    function upsertAsset(
+        bytes32 assetId,
+        uint256 requestId,
+        address requester,
+        address subject,
+        bytes32 docBundleHash,
+        string calldata metadataUri,
+        uint64 requestedAt
+    ) external;
+    function setDecision(bytes32 assetId, bool approved, uint32 riskScore, bytes32 attestationHash) external;
+    function setVault(bytes32 assetId, address vault) external;
+}
+
+interface IRWAVaultFactory {
+    function vaultByAssetId(bytes32 assetId) external view returns (address vault);
+    function createVault(bytes32 assetId, string calldata name, string calldata symbol) external returns (address vault);
+}
+
 /// @notice Receiver contract for CRE `EVMClient.writeReport` workflows.
 /// The Keystone Forwarder calls `onReport(metadata, report)` after verifying DON signatures.
 /// This contract validates workflow identity from `metadata`, decodes `report`, and writes the
@@ -55,6 +88,12 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
     address public validationResponder;
     bool public validationAutoRespond;
 
+    /// @dev Optional: automated per-request RWA lifecycle.
+    IDiligencePortal public diligencePortal;
+    IRWAAssetRegistry public rwaAssetRegistry;
+    IRWAVaultFactory public rwaVaultFactory;
+    bool public autoCreateRwaVaults;
+
     bytes32 public expectedWorkflowId; // optional (0 disables check)
     address public expectedAuthor; // optional (0 disables check)
     bytes10 public expectedWorkflowName; // optional (0 disables check)
@@ -73,11 +112,29 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
     event ERC8004ValidationRequestFailed(uint256 indexed agentId, bytes reason);
     event ERC8004ValidationResponded(uint256 indexed agentId, bytes32 indexed requestHash, uint8 response, bytes32 responseHash);
     event ERC8004ValidationResponseFailed(uint256 indexed agentId, bytes32 indexed requestHash, bytes reason);
+    event RWAAssetPipelineUpdated(
+        address indexed portal,
+        address indexed assetRegistry,
+        address indexed vaultFactory,
+        bool autoCreateVaults
+    );
+    event RWARequestProcessed(
+        uint256 indexed requestId,
+        bytes32 indexed assetId,
+        address indexed subject,
+        bool approved,
+        uint32 riskScore,
+        bytes32 attestationHash
+    );
+    event RWAVaultAutoCreated(uint256 indexed requestId, bytes32 indexed assetId, address indexed vault);
 
     error InvalidForwarder(address caller);
     error InvalidWorkflowId(bytes32 received, bytes32 expected);
     error InvalidAuthor(address received, address expected);
     error InvalidWorkflowName(bytes10 received, bytes10 expected);
+    error InvalidReportLength(uint256 receivedLength);
+    error RequestNotFound(uint256 requestId);
+    error RequestSubjectMismatch(address expectedSubject, address reportSubject);
     error ZeroAddress();
     error ValueDecimalsOutOfRange(uint8 valueDecimals);
 
@@ -139,9 +196,22 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
         emit ERC8004ValidationConfigUpdated(registry_, agentId_, responder_, autoRespond_);
     }
 
+    function setRWAAssetPipeline(address portal_, address assetRegistry_, address vaultFactory_, bool autoCreateVaults_)
+        external
+        onlyOwner
+    {
+        diligencePortal = IDiligencePortal(portal_);
+        rwaAssetRegistry = IRWAAssetRegistry(assetRegistry_);
+        rwaVaultFactory = IRWAVaultFactory(vaultFactory_);
+        autoCreateRwaVaults = autoCreateVaults_;
+        emit RWAAssetPipelineUpdated(portal_, assetRegistry_, vaultFactory_, autoCreateVaults_);
+    }
+
     /// @notice Called by Keystone Forwarder with the DON-verified report.
     /// @param metadata Unused (required by the receiver interface).
-    /// @param report ABI-encoded tuple: (address subject, bool approved, uint32 riskScore, bytes32 attestationHash)
+    /// @param report ABI-encoded tuple:
+    /// legacy: `(address subject, bool approved, uint32 riskScore, bytes32 attestationHash)`
+    /// current: `(uint256 requestId, address subject, bool approved, uint32 riskScore, bytes32 attestationHash)`
     function onReport(bytes calldata metadata, bytes calldata report) external override {
         address expectedForwarder = forwarder;
         if (expectedForwarder != address(0) && msg.sender != expectedForwarder) revert InvalidForwarder(msg.sender);
@@ -157,8 +227,7 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
         bytes10 expName = expectedWorkflowName;
         if (expName != bytes10(0) && workflowName != expName) revert InvalidWorkflowName(workflowName, expName);
 
-        (address subject, bool approved, uint32 riskScore, bytes32 attestationHash) =
-            abi.decode(report, (address, bool, uint32, bytes32));
+        (uint256 requestId, address subject, bool approved, uint32 riskScore, bytes32 attestationHash) = _decodeReport(report);
 
         complianceRegistry.setApproval(subject, approved, riskScore, attestationHash);
         emit ReportProcessed(subject, approved, riskScore, attestationHash);
@@ -186,6 +255,7 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
         }
 
         _tryRecordERC8004Artifacts(subject, approved, riskScore, attestationHash);
+        _trySyncRWAAssets(requestId, subject, approved, riskScore, attestationHash);
     }
 
     function _buildEASData(address subject, bool approved, uint32 riskScore, bytes32 attestationHash)
@@ -269,6 +339,70 @@ contract RWAComplianceReceiver is Ownable, IReceiver {
         if (!approved) return 0;
         uint256 bounded = riskScore > 1000 ? 1000 : uint256(riskScore);
         return uint8(100 - (bounded / 10));
+    }
+
+    function _decodeReport(bytes memory report)
+        internal
+        pure
+        returns (uint256 requestId, address subject, bool approved, uint32 riskScore, bytes32 attestationHash)
+    {
+        if (report.length == 160) {
+            (requestId, subject, approved, riskScore, attestationHash) =
+                abi.decode(report, (uint256, address, bool, uint32, bytes32));
+            return (requestId, subject, approved, riskScore, attestationHash);
+        }
+
+        if (report.length == 128) {
+            (subject, approved, riskScore, attestationHash) = abi.decode(report, (address, bool, uint32, bytes32));
+            return (0, subject, approved, riskScore, attestationHash);
+        }
+
+        revert InvalidReportLength(report.length);
+    }
+
+    function _trySyncRWAAssets(uint256 requestId, address subject, bool approved, uint32 riskScore, bytes32 attestationHash)
+        internal
+    {
+        IDiligencePortal portal = diligencePortal;
+        IRWAAssetRegistry assetRegistry = rwaAssetRegistry;
+        IRWAVaultFactory vaultFactory = rwaVaultFactory;
+
+        if (requestId == 0 || address(portal) == address(0) || address(assetRegistry) == address(0)) {
+            return;
+        }
+
+        IDiligencePortal.Request memory req = portal.getRequest(requestId);
+        if (req.subject == address(0)) revert RequestNotFound(requestId);
+        if (req.subject != subject) revert RequestSubjectMismatch(req.subject, subject);
+
+        bytes32 assetId = portal.assetIdForRequest(requestId);
+        if (assetId == bytes32(0)) {
+            assetId = keccak256(abi.encode(req.requester, req.subject, req.docBundleHash, req.metadataUri));
+        }
+
+        assetRegistry.upsertAsset(
+            assetId, requestId, req.requester, req.subject, req.docBundleHash, req.metadataUri, req.requestedAt
+        );
+        assetRegistry.setDecision(assetId, approved, riskScore, attestationHash);
+
+        emit RWARequestProcessed(requestId, assetId, subject, approved, riskScore, attestationHash);
+
+        if (approved && autoCreateRwaVaults && address(vaultFactory) != address(0)) {
+            address vault = vaultFactory.vaultByAssetId(assetId);
+            if (vault == address(0)) {
+                (string memory name, string memory symbol) = _vaultNameAndSymbol(requestId);
+                vault = vaultFactory.createVault(assetId, name, symbol);
+            }
+            if (vault != address(0)) {
+                assetRegistry.setVault(assetId, vault);
+                emit RWAVaultAutoCreated(requestId, assetId, vault);
+            }
+        }
+    }
+
+    function _vaultNameAndSymbol(uint256 requestId) internal pure returns (string memory name, string memory symbol) {
+        name = string.concat("DeepSeal RWA Vault #", Strings.toString(requestId));
+        symbol = string.concat("DSRWA", Strings.toString(requestId));
     }
 
     /// @notice Extract workflow identity fields from the metadata parameter of onReport.
