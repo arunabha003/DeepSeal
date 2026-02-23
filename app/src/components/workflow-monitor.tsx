@@ -619,6 +619,48 @@ export function WorkflowMonitor({
                   {/* Side effects data card */}
                   {step?.data && p.id === "side-effects" && (
                     <div className="mt-2 space-y-2">
+                      {Boolean(step.data.assetId || step.data.vaultAddress) && (
+                        <div className="p-2.5 rounded bg-success/5 border border-success/20 text-[11px]">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-[10px] font-semibold uppercase tracking-widest text-success">
+                              RWA Asset Lifecycle
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/20 text-success font-mono">
+                              ✓ on-chain
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {step.data.requestId ? (
+                              <div>
+                                <span className="text-muted block">Request ID</span>
+                                <span className="font-mono text-white">#{String(step.data.requestId)}</span>
+                              </div>
+                            ) : null}
+                            {typeof step.data.assetId === "string" && /^0x[0-9a-fA-F]{64}$/.test(step.data.assetId) ? (
+                              <div>
+                                <span className="text-muted block">Asset ID</span>
+                                <code className="font-mono text-zinc-300" title={step.data.assetId}>
+                                  {step.data.assetId.slice(0, 14)}...{step.data.assetId.slice(-10)}
+                                </code>
+                              </div>
+                            ) : null}
+                            {isEvmAddress(step.data.vaultAddress) ? (
+                              <div className="md:col-span-2">
+                                <span className="text-muted block">Per-Asset Vault</span>
+                                <a
+                                  href={`https://sepolia.basescan.org/address/${step.data.vaultAddress}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-mono text-accent hover:underline inline-flex items-center gap-0.5"
+                                >
+                                  {step.data.vaultAddress}
+                                  <span className="text-[9px]">↗</span>
+                                </a>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      )}
                       {/* ERC-8004 Agent Scores */}
                       {Array.isArray(step.data.erc8004Agents) && (step.data.erc8004Agents as { agentId: number; value: number; decimals: number; display: string }[]).length > 0 && (
                         <div className="p-2.5 rounded bg-accent/5 border border-accent/20 text-[11px]">
@@ -747,6 +789,12 @@ export function WorkflowMonitor({
             </span>
           </div>
           <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-[11px]">
+            <div>
+              <span className="text-muted block mb-0.5">Request ID</span>
+              <span className="font-mono text-white">
+                #{String(simResult.requestId ?? requestId)}
+              </span>
+            </div>
             <div>
               <span className="text-muted block mb-0.5">Subject</span>
               <a

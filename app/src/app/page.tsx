@@ -62,6 +62,24 @@ export default function Dashboard() {
     functionName: "validationAgentId",
   });
 
+  const { data: receiverAssetRegistry } = useReadContract({
+    address: ADDRESSES.RWAComplianceReceiver as `0x${string}`,
+    abi: RWAComplianceReceiverABI,
+    functionName: "rwaAssetRegistry",
+  });
+
+  const { data: receiverVaultFactory } = useReadContract({
+    address: ADDRESSES.RWAComplianceReceiver as `0x${string}`,
+    abi: RWAComplianceReceiverABI,
+    functionName: "rwaVaultFactory",
+  });
+
+  const { data: autoCreateRwaVaults } = useReadContract({
+    address: ADDRESSES.RWAComplianceReceiver as `0x${string}`,
+    abi: RWAComplianceReceiverABI,
+    functionName: "autoCreateRwaVaults",
+  });
+
   const totalRequests = nextRequestId ? Number(nextRequestId) - 1 : 0;
   const protocolAgentIds = [repAgentId, valAgentId]
     .filter((id): id is bigint => typeof id === "bigint" && id > 0n)
@@ -158,6 +176,20 @@ export default function Dashboard() {
             <div className="flex justify-between text-sm">
               <span className="text-muted">Validation Agent</span>
               <code className="font-mono text-xs text-accent">#{valAgentId?.toString()}</code>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">Asset Registry</span>
+              <AddressLink address={(receiverAssetRegistry as string) || ""} chars={6} />
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">Vault Factory</span>
+              <AddressLink address={(receiverVaultFactory as string) || ""} chars={6} />
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">Auto-create per-asset vaults</span>
+              <Badge variant={autoCreateRwaVaults ? "success" : "warning"}>
+                {autoCreateRwaVaults ? "Enabled" : "Disabled"}
+              </Badge>
             </div>
           </div>
         </Card>

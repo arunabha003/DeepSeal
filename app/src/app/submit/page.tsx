@@ -254,6 +254,12 @@ function RequestRow({ requestId }: { requestId: number }) {
     functionName: "getRequest",
     args: [BigInt(requestId)],
   });
+  const { data: assetIdData } = useReadContract({
+    address: ADDRESSES.DiligencePortal as `0x${string}`,
+    abi: DiligencePortalABI,
+    functionName: "assetIdForRequest",
+    args: [BigInt(requestId)],
+  });
 
   const req = data as
     | {
@@ -264,6 +270,7 @@ function RequestRow({ requestId }: { requestId: number }) {
         requestedAt: bigint;
       }
     | undefined;
+  const assetId = (assetIdData as string) || "";
 
   if (!req) return null;
 
@@ -283,6 +290,11 @@ function RequestRow({ requestId }: { requestId: number }) {
         >
           {truncateMiddle(req.metadataUri)}
         </a>
+        {assetId && !/^0x0{64}$/i.test(assetId) && (
+          <code className="block mt-1 text-[11px] font-mono text-zinc-500" title={assetId}>
+            assetId: {truncateMiddle(assetId, 14, 10)}
+          </code>
+        )}
       </div>
       <div className="text-right">
         <span className="text-[11px] font-mono text-muted whitespace-nowrap">

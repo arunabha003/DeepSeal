@@ -23,6 +23,8 @@ const addresses = {
   DiligencePortal: nameMap.DiligencePortal,
   RWAComplianceReceiver: nameMap.RWAComplianceReceiver,
   RWAVault: nameMap.RWAVault,
+  RWAAssetRegistry: nameMap.RWAAssetRegistry || "0x0000000000000000000000000000000000000000",
+  RWAVaultFactory: nameMap.RWAVaultFactory || "0x0000000000000000000000000000000000000000",
   IdentityRegistry: nameMap.IdentityRegistry,
   ReputationRegistry: nameMap.ReputationRegistry,
   ValidationRegistry: nameMap.ValidationRegistry,

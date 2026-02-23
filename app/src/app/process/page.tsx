@@ -4,10 +4,12 @@ import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useReadContract } from "wagmi";
 import { ADDRESSES } from "@/lib/addresses";
-import { DiligencePortalABI } from "@/lib/abis";
+import { DiligencePortalABI, RWAAssetRegistryABI } from "@/lib/abis";
 import { Card, CardTitle, Button, AddressLink } from "@/components/ui";
 import { WorkflowMonitor } from "@/components/workflow-monitor";
 import Link from "next/link";
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 const truncateMiddle = (value: string, start = 16, end = 12) => {
   if (!value || value.length <= start + end + 3) return value;
@@ -36,6 +38,27 @@ function ProcessContent() {
     functionName: "nextRequestId",
   });
 
+  const { data: assetIdData } = useReadContract({
+    address: ADDRESSES.DiligencePortal as `0x${string}`,
+    abi: DiligencePortalABI,
+    functionName: "assetIdForRequest",
+    args: activeId > 0 ? [BigInt(activeId)] : undefined,
+    query: { enabled: activeId > 0 },
+  });
+
+  const hasAssetRegistry =
+    (ADDRESSES.RWAAssetRegistry || "").toLowerCase() !== ZERO_ADDRESS.toLowerCase();
+  const assetId = (assetIdData as string | undefined) || "";
+  const hasAssetId = /^0x[0-9a-fA-F]{64}$/.test(assetId) && !/^0x0{64}$/i.test(assetId);
+
+  const { data: assetRecordData } = useReadContract({
+    address: ADDRESSES.RWAAssetRegistry as `0x${string}`,
+    abi: RWAAssetRegistryABI,
+    functionName: "getAsset",
+    args: hasAssetId ? [assetId as `0x${string}`] : undefined,
+    query: { enabled: hasAssetRegistry && hasAssetId },
+  });
+
   const req = requestData as
     | {
         requester: string;
@@ -43,6 +66,22 @@ function ProcessContent() {
         docBundleHash: string;
         metadataUri: string;
         requestedAt: bigint;
+      }
+    | undefined;
+  const assetRecord = assetRecordData as
+    | {
+        requestId: bigint;
+        requester: string;
+        subject: string;
+        docBundleHash: string;
+        metadataUri: string;
+        requestedAt: bigint;
+        approved: boolean;
+        riskScore: number;
+        attestationHash: string;
+        decidedAt: bigint;
+        vault: string;
+        exists: boolean;
       }
     | undefined;
 
@@ -130,6 +169,31 @@ function ProcessContent() {
               <code className="font-mono text-zinc-300" title={req.docBundleHash}>
                 {truncateMiddle(req.docBundleHash, 16, 12)}
               </code>
+            </div>
+            <div>
+              <span className="text-muted block mb-0.5">Derived Asset ID</span>
+              <code className="font-mono text-zinc-300" title={assetId || ""}>
+                {hasAssetId ? truncateMiddle(assetId, 16, 12) : "--"}
+              </code>
+            </div>
+            <div>
+              <span className="text-muted block mb-0.5">Asset Registry</span>
+              {!hasAssetRegistry ? (
+                <span className="text-zinc-500">Not configured</span>
+              ) : assetRecord?.exists ? (
+                <span className="text-success font-mono">synced on-chain</span>
+              ) : (
+                <span className="text-zinc-500">pending workflow write</span>
+              )}
+            </div>
+            <div>
+              <span className="text-muted block mb-0.5">Per-Asset Vault</span>
+              {assetRecord?.vault &&
+              assetRecord.vault.toLowerCase() !== ZERO_ADDRESS.toLowerCase() ? (
+                <AddressLink address={assetRecord.vault} chars={8} />
+              ) : (
+                <span className="text-zinc-500">not created yet</span>
+              )}
             </div>
           </div>
         </Card>

@@ -37,11 +37,31 @@ export const DiligencePortalABI = [
     stateMutability: "view",
   },
   {
+    type: "function",
+    name: "assetIdForRequest",
+    inputs: [{ name: "requestId", type: "uint256" }],
+    outputs: [{ name: "", type: "bytes32" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "computeAssetId",
+    inputs: [
+      { name: "requester", type: "address" },
+      { name: "subject", type: "address" },
+      { name: "docBundleHash", type: "bytes32" },
+      { name: "metadataUri", type: "string" },
+    ],
+    outputs: [{ name: "", type: "bytes32" }],
+    stateMutability: "pure",
+  },
+  {
     type: "event",
     name: "DiligenceRequested",
     inputs: [
       { name: "requestId", type: "uint256", indexed: true },
-      { name: "requester", type: "address", indexed: true },
+      { name: "assetId", type: "bytes32", indexed: true },
+      { name: "requester", type: "address", indexed: false },
       { name: "subject", type: "address", indexed: true },
       { name: "docBundleHash", type: "bytes32", indexed: false },
       { name: "metadataUri", type: "string", indexed: false },
@@ -557,6 +577,34 @@ export const RWAComplianceReceiverABI = [
     stateMutability: "view",
   },
   {
+    type: "function",
+    name: "diligencePortal",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "rwaAssetRegistry",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "rwaVaultFactory",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "autoCreateRwaVaults",
+    inputs: [],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+  },
+  {
     type: "event",
     name: "ReportProcessed",
     inputs: [
@@ -573,5 +621,51 @@ export const RWAComplianceReceiverABI = [
       { name: "subject", type: "address", indexed: true },
       { name: "uid", type: "bytes32", indexed: true },
     ],
+  },
+] as const;
+
+export const RWAAssetRegistryABI = [
+  {
+    type: "function",
+    name: "getAssetIdByRequest",
+    inputs: [{ name: "requestId", type: "uint256" }],
+    outputs: [{ name: "", type: "bytes32" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getAsset",
+    inputs: [{ name: "assetId", type: "bytes32" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "requestId", type: "uint256" },
+          { name: "requester", type: "address" },
+          { name: "subject", type: "address" },
+          { name: "docBundleHash", type: "bytes32" },
+          { name: "metadataUri", type: "string" },
+          { name: "requestedAt", type: "uint64" },
+          { name: "approved", type: "bool" },
+          { name: "riskScore", type: "uint32" },
+          { name: "attestationHash", type: "bytes32" },
+          { name: "decidedAt", type: "uint64" },
+          { name: "vault", type: "address" },
+          { name: "exists", type: "bool" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+] as const;
+
+export const RWAVaultFactoryABI = [
+  {
+    type: "function",
+    name: "vaultByAssetId",
+    inputs: [{ name: "assetId", type: "bytes32" }],
+    outputs: [{ name: "vault", type: "address" }],
+    stateMutability: "view",
   },
 ] as const;

@@ -652,12 +652,13 @@ export async function POST(req: NextRequest) {
             "0x0000000000000000000000000000000000000000000000000000000000000000") as Hex;
           const subject = simResult.subject as Hex;
 
-          // Encode the report: (address subject, bool approved, uint32 riskScore, bytes32 attestationHash)
+          // Encode the report:
+          // (uint256 requestId, address subject, bool approved, uint32 riskScore, bytes32 attestationHash)
           const report = encodeAbiParameters(
             parseAbiParameters(
-              "address subject, bool approved, uint32 riskScore, bytes32 attestationHash"
+              "uint256 requestId, address subject, bool approved, uint32 riskScore, bytes32 attestationHash"
             ),
-            [subject, approved, riskScore, attestationHash]
+            [BigInt(requestId), subject, approved, riskScore, attestationHash]
           );
 
           // Encode metadata: 32 bytes workflowId + 10 bytes workflowName + 20 bytes workflowOwner
@@ -691,7 +692,7 @@ export async function POST(req: NextRequest) {
             status: success ? "complete" : "error",
             label: "Broadcast On-Chain (onReport)",
             detail: success
-              ? `tx: ${txHash} · ComplianceRegistry updated + ERC-8004 side effects`
+              ? `tx: ${txHash} · ComplianceRegistry + RWA asset sync + ERC-8004 side effects`
               : `tx: ${txHash} · Transaction reverted`,
             data: {
               txHash,
@@ -709,13 +710,28 @@ export async function POST(req: NextRequest) {
             const FEEDBACK_GIVEN = "0x6a4a61743519c9d648a14e6493f47dbe3ff1aa29e7785c96c8326a205e58febc";
             const EAS_ATTESTED = "0xe5000e8d007541a20bb85e4d344e4d4a495f6945d469389b23d4d00fa684b9aa";
             const EAS_ATTEST_FAILED = "0x6ee9a79d936fb15d44457ed75a9f5c768372aecf024ee83f5937d3df0d8e90d8";
+            const ASSET_UPSERTED = "0x891c8aa58b1303891df9cd1a8124930e4d7a0ccefa656c655aa3a4154f1f1d02";
+            const ASSET_DECISION_UPDATED = "0x6cc58ef0e6080ca644f2e1f98b59278711f775effff24f057baf70b1bcca9d29";
+            const ASSET_VAULT_UPDATED = "0xabf33845d055e0f153682728264f3f8c829d6e8919d080adfb0574b2e26f7301";
+            const RWA_REQUEST_PROCESSED = "0x33db5933a8f3703d291ce6c7ff76e6bf68190315fcd07c1c6feb65c376fece72";
+            const RWA_VAULT_AUTO_CREATED = "0x085b8a0795c1d70d47732fd99143d54e7bc5007ccf6633b333ba5757912de4a1";
+            const VAULT_CREATED = "0x66412e6f3535f0fc920ab41f67fc654efbc03cfe78411213967703ede5468996";
 
             const sideEffects: string[] = [];
             const erc8004Agents: { agentId: number; value: number; decimals: number; display: string }[] = [];
+            const rwaAsset: {
+              requestId?: number;
+              assetId?: string;
+              vaultAddress?: string;
+            } = {};
             let easAttestationUid: string | null = null;
 
             for (const log of receipt.logs) {
               const topic0 = log.topics[0] || "";
+              const topicAddress = (topic: string | undefined): string | null => {
+                if (!topic || topic.length < 42) return null;
+                return `0x${topic.slice(-40)}`;
+              };
               if (topic0 === COMPLIANCE_UPDATED) {
                 sideEffects.push("✓ ComplianceRegistry.ComplianceUpdated");
               } else if (topic0 === REPORT_PROCESSED) {
@@ -746,6 +762,38 @@ export async function POST(req: NextRequest) {
                 sideEffects.push(`✓ EAS Attestation created: ${(easAttestationUid || "").slice(0, 14)}...`);
               } else if (topic0 === EAS_ATTEST_FAILED) {
                 sideEffects.push(`✗ EAS Attestation failed`);
+              } else if (topic0 === ASSET_UPSERTED) {
+                const assetId = log.topics[1];
+                const requestId = Number(BigInt(log.topics[2] || "0"));
+                if (assetId) rwaAsset.assetId = assetId;
+                if (requestId > 0) rwaAsset.requestId = requestId;
+                sideEffects.push(`✓ RWAAssetRegistry.AssetUpserted (request #${requestId})`);
+              } else if (topic0 === ASSET_DECISION_UPDATED) {
+                sideEffects.push("✓ RWAAssetRegistry.AssetDecisionUpdated");
+              } else if (topic0 === ASSET_VAULT_UPDATED) {
+                const vaultAddress = topicAddress(log.topics[2]);
+                if (vaultAddress) rwaAsset.vaultAddress = vaultAddress;
+                sideEffects.push("✓ RWAAssetRegistry.AssetVaultUpdated");
+              } else if (topic0 === RWA_REQUEST_PROCESSED) {
+                const requestId = Number(BigInt(log.topics[1] || "0"));
+                const assetId = log.topics[2];
+                if (assetId) rwaAsset.assetId = assetId;
+                if (requestId > 0) rwaAsset.requestId = requestId;
+                sideEffects.push(`✓ RWAComplianceReceiver.RWARequestProcessed (#${requestId})`);
+              } else if (topic0 === RWA_VAULT_AUTO_CREATED) {
+                const requestId = Number(BigInt(log.topics[1] || "0"));
+                const assetId = log.topics[2];
+                const vaultAddress = topicAddress(log.topics[3]);
+                if (assetId) rwaAsset.assetId = assetId;
+                if (requestId > 0) rwaAsset.requestId = requestId;
+                if (vaultAddress) rwaAsset.vaultAddress = vaultAddress;
+                sideEffects.push(`✓ Per-asset vault auto-created for request #${requestId}`);
+              } else if (topic0 === VAULT_CREATED) {
+                const assetId = log.topics[1];
+                const vaultAddress = topicAddress(log.topics[2]);
+                if (assetId) rwaAsset.assetId = assetId;
+                if (vaultAddress) rwaAsset.vaultAddress = vaultAddress;
+                sideEffects.push("✓ RWAVaultFactory.VaultCreated");
               } else if (log.topics[0]) {
                 sideEffects.push(`Event from ${log.address.slice(0, 10)}...`);
               }
@@ -761,6 +809,9 @@ export async function POST(req: NextRequest) {
                 logsCount: receipt.logs.length,
                 erc8004Agents,
                 easAttestationUid,
+                requestId: rwaAsset.requestId ?? Number(requestId),
+                assetId: rwaAsset.assetId ?? null,
+                vaultAddress: rwaAsset.vaultAddress ?? null,
               },
             });
           }
