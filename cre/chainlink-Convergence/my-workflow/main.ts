@@ -735,16 +735,18 @@ const fetchGeminiRisk = (
 
 	const toModelName = (raw: string): string => raw.replace(/^models\//, '').trim()
 	const buildGenerateUrl = (modelName: string): string =>
-		`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-			toModelName(modelName),
-		)}:generateContent?key=${encodeURIComponent(apiKey)}`
+		`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(toModelName(modelName))}:generateContent`
+	const listModelsUrl = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 	const doGenerateCall = (modelName: string) =>
 		sendRequester
 			.sendRequest({
 				method: 'POST',
 				url: buildGenerateUrl(modelName),
-				headers: { 'content-type': 'application/json' },
+				headers: {
+					'content-type': 'application/json',
+					'x-goog-api-key': apiKey,
+				},
 				body,
 			})
 			.result()
@@ -759,7 +761,10 @@ const fetchGeminiRisk = (
 			const modelsResp = sendRequester
 				.sendRequest({
 					method: 'GET',
-					url: `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+					url: listModelsUrl,
+					headers: {
+						'x-goog-api-key': apiKey,
+					},
 				})
 				.result()
 			if (modelsResp.statusCode >= 200 && modelsResp.statusCode < 300) {
@@ -820,6 +825,131 @@ const fetchGeminiRisk = (
 
 	const risk = parseRiskJson(outText)
 
+	if (typeof risk.approved !== 'boolean') throw new Error('risk.approved must be boolean')
+	if (typeof risk.riskScore !== 'number') throw new Error('risk.riskScore must be number')
+	if (!Array.isArray(risk.reasons)) throw new Error('risk.reasons must be string[]')
+
+	return {
+		approved: risk.approved,
+		riskScore: risk.riskScore,
+		reasonsText: JSON.stringify(risk.reasons),
+	}
+}
+
+const fetchGeminiRiskConfidential = (
+	sendRequester: ConfidentialHTTPSendRequester,
+	config: Config,
+	apiKey: string,
+	prompt: string,
+	runtime: Runtime<Config>,
+): RiskObservation => {
+	const bodyString = JSON.stringify({
+		contents: [{ role: 'user', parts: [{ text: prompt }] }],
+		generationConfig: {
+			responseMimeType: 'application/json',
+			temperature: 0,
+		},
+	})
+
+	const toModelName = (raw: string): string => raw.replace(/^models\//, '').trim()
+	const buildGenerateUrl = (modelName: string): string =>
+		`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(toModelName(modelName))}:generateContent`
+	const listModelsUrl = 'https://generativelanguage.googleapis.com/v1beta/models'
+	const apiHeaders = {
+		'content-type': { values: ['application/json'] },
+		'x-goog-api-key': { values: [apiKey] },
+	}
+
+	const doGenerateCall = (modelName: string) =>
+		sendRequester
+			.sendRequest({
+				vaultDonSecrets: [],
+				encryptOutput: false,
+				request: {
+					method: 'POST',
+					url: buildGenerateUrl(modelName),
+					bodyString,
+					multiHeaders: apiHeaders,
+				},
+			})
+			.result()
+
+	let selectedModel = config.geminiModel
+	let response = doGenerateCall(selectedModel)
+
+	if (response.statusCode < 200 || response.statusCode >= 300) {
+		let errorBody = decodeBodyUtf8(response.body)
+		if (response.statusCode === 404) {
+			const modelsResp = sendRequester
+				.sendRequest({
+					vaultDonSecrets: [],
+					encryptOutput: false,
+					request: {
+						method: 'GET',
+						url: listModelsUrl,
+						multiHeaders: {
+							'x-goog-api-key': { values: [apiKey] },
+						},
+					},
+				})
+				.result()
+			if (modelsResp.statusCode >= 200 && modelsResp.statusCode < 300) {
+				const list = safeJsonParse(decodeBodyUtf8(modelsResp.body))
+				const available: string[] = (list?.models || [])
+					.filter((m: any) => Array.isArray(m?.supportedGenerationMethods))
+					.filter((m: any) => m.supportedGenerationMethods.includes('generateContent'))
+					.map((m: any) => String(m?.name || '').replace(/^models\//, ''))
+					.filter((v: string) => v.length > 0)
+
+				const preferredMatchers = ['2.5-flash', '2.0-flash', '1.5-flash', 'flash', 'pro']
+				const fallback =
+					preferredMatchers
+						.map((match) => available.find((m) => m.includes(match)))
+						.find(Boolean) || available[0]
+
+				if (fallback) {
+					runtime.log(`Configured geminiModel=${config.geminiModel} unavailable. Retrying with model=${fallback}`)
+					selectedModel = fallback
+					response = doGenerateCall(selectedModel)
+					errorBody = decodeBodyUtf8(response.body)
+				}
+			}
+		}
+		if (response.statusCode < 200 || response.statusCode >= 300) {
+			throw new Error(`Gemini confidential HTTP request failed with status: ${response.statusCode} body=${errorBody}`)
+		}
+	}
+
+	const jsonResp = safeJsonParse(decodeBodyUtf8(response.body)) as any
+	const outText =
+		(jsonResp?.candidates?.[0]?.content?.parts ?? [])
+			.map((p: any) => (typeof p?.text === 'string' ? p.text : ''))
+			.join('') || ''
+
+	const parseRiskJson = (raw: string): RiskJson => {
+		const trimmed = raw.trim()
+		const attempts: string[] = [trimmed]
+		if (trimmed.startsWith('```')) {
+			const noFence = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim()
+			attempts.push(noFence)
+		}
+		const firstObj = trimmed.indexOf('{')
+		const lastObj = trimmed.lastIndexOf('}')
+		if (firstObj >= 0 && lastObj > firstObj) {
+			attempts.push(trimmed.slice(firstObj, lastObj + 1))
+		}
+
+		for (const candidate of attempts) {
+			try {
+				return JSON.parse(candidate) as RiskJson
+			} catch {
+				// try next shape
+			}
+		}
+		throw new Error(`Gemini did not return parseable JSON. Got: ${raw}`)
+	}
+
+	const risk = parseRiskJson(outText)
 	if (typeof risk.approved !== 'boolean') throw new Error('risk.approved must be boolean')
 	if (typeof risk.riskScore !== 'number') throw new Error('risk.riskScore must be number')
 	if (!Array.isArray(risk.reasons)) throw new Error('risk.reasons must be string[]')
@@ -936,6 +1066,7 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 	const x402BuyerPk = Boolean(runtime.config.x402Enabled) ? getRequiredSecret(runtime, 'X402_BUYER_PRIVATE_KEY') : ''
 	const docResolverApiKey = getOptionalSecret(runtime, 'DOC_RESOLVER_API_KEY')
 	const useConf = Boolean(runtime.config.useConfidentialHttp)
+	runtime.log(`CRE transport mode confidentialHttp=${useConf}`)
 
 	let documentResolution: DocumentResolution
 	let companyInfo: CompanyInfo
@@ -1041,17 +1172,30 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 
 	const apiKey = getRequiredSecret(runtime, 'GEMINI_API_KEY')
 
-	const geminiRisk = new HTTPClient()
-		.sendRequest(
-			runtime,
-			(sr: HTTPSendRequester, cfg: Config) => fetchGeminiRisk(sr, cfg, apiKey, prompt, runtime),
-			ConsensusAggregationByFields<RiskObservation>({
-				approved: identical,
-				riskScore: median,
-				reasonsText: identical,
-			}),
-		)(runtime.config)
-		.result()
+	const geminiRisk = useConf
+		? new ConfidentialHTTPClient()
+				.sendRequest(
+					runtime,
+					(sr: ConfidentialHTTPSendRequester, cfg: Config) =>
+						fetchGeminiRiskConfidential(sr, cfg, apiKey, prompt, runtime),
+					ConsensusAggregationByFields<RiskObservation>({
+						approved: identical,
+						riskScore: median,
+						reasonsText: identical,
+					}),
+				)(runtime.config)
+				.result()
+		: new HTTPClient()
+				.sendRequest(
+					runtime,
+					(sr: HTTPSendRequester, cfg: Config) => fetchGeminiRisk(sr, cfg, apiKey, prompt, runtime),
+					ConsensusAggregationByFields<RiskObservation>({
+						approved: identical,
+						riskScore: median,
+						reasonsText: identical,
+					}),
+				)(runtime.config)
+				.result()
 
 	const approved = Boolean(geminiRisk.approved && kyb.providerStatus === 'APPROVED')
 	const riskScore = Math.max(0, Math.min(1000, Math.floor(geminiRisk.riskScore)))
@@ -1082,6 +1226,8 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 		subject: req.subject,
 		approved,
 		riskScore,
+		providerStatus: kyb.providerStatus,
+		providerScore: kyb.providerScore,
 		providerResponseHash: providerHash,
 		reportHash,
 		extractionHash,

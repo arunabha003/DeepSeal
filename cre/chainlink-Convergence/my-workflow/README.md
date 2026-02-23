@@ -57,6 +57,10 @@ The real config files are gitignored and intended to be per-user/per-environment
 
 ## x402 + Confidential HTTP
 - x402 buyer retries are implemented for both HTTP client paths.
+- When `useConfidentialHttp=true`, the workflow runs **all sensitive offchain calls** via `ConfidentialHTTPClient`:
+  - document resolver (`/docs/resolve`)
+  - KYB provider (`/kyb`)
+  - Gemini risk scoring (`generativelanguage.googleapis.com`)
 - For paid mode, set:
   - workflow `kybUrl` to `/kyb`
   - `x402Enabled=true`
@@ -70,6 +74,11 @@ If you use local fallback, reset config files before commit:
 git restore --worktree cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json
 git restore --worktree cre/chainlink-Convergence/my-workflow/config.staging.json
 ```
+
+`Workflow Simulation Result` now includes:
+- `providerStatus`
+- `providerScore`
+- `x402TxHash` (decoded from `X-PAYMENT-RESPONSE` when present)
 
 ## 4) Run KYB provider (local)
 In repo root:
