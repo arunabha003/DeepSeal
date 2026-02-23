@@ -758,10 +758,26 @@ export async function POST(req: NextRequest) {
             args: [metadata as Hex, report],
           });
 
+          let gasLimit = 1_000_000n;
+          try {
+            const estimated = await publicClient.estimateGas({
+              account: account.address,
+              to: receiverAddr,
+              data: calldata,
+            });
+            const buffered = (estimated * 120n) / 100n; // +20% headroom
+            const minGas = 1_000_000n;
+            const maxGas = 5_000_000n;
+            gasLimit =
+              buffered < minGas ? minGas : buffered > maxGas ? maxGas : buffered;
+          } catch {
+            gasLimit = 2_500_000n; // fallback for nodes that fail estimateGas
+          }
+
           const txHash = await walletClient.sendTransaction({
             to: receiverAddr,
             data: calldata,
-            gas: 1_000_000n,
+            gas: gasLimit,
           });
 
           const receipt = await publicClient.waitForTransactionReceipt({
@@ -780,6 +796,7 @@ export async function POST(req: NextRequest) {
             data: {
               txHash,
               blockNumber: Number(receipt.blockNumber),
+              gasLimit: gasLimit.toString(),
               gasUsed: receipt.gasUsed.toString(),
               logsCount: receipt.logs.length,
             },

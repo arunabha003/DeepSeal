@@ -1,17 +1,22 @@
 "use client";
 
+import { useMemo } from "react";
 import { useReadContract, useReadContracts } from "wagmi";
 import { ADDRESSES } from "@/lib/addresses";
 import {
   DiligencePortalABI,
   ComplianceRegistryABI,
   RWAVaultABI,
+  RWAVaultFactoryABI,
   RWAComplianceReceiverABI,
 } from "@/lib/abis";
 import { Card, CardTitle, Stat, Badge, StatusDot, AddressLink } from "@/components/ui";
 import { formatUnits } from "@/lib/utils";
 import { IS_LOCAL } from "@/lib/network";
 import Link from "next/link";
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ZERO_BYTES32 = `0x${"0".repeat(64)}`;
 
 export default function Dashboard() {
   const { data: nextRequestId } = useReadContract({
@@ -81,12 +86,96 @@ export default function Dashboard() {
   });
 
   const totalRequests = nextRequestId ? Number(nextRequestId) - 1 : 0;
+
+  const hasPerAssetFactory =
+    (ADDRESSES.RWAVaultFactory || "").toLowerCase() !== ZERO_ADDRESS.toLowerCase();
+
+  const requestIds = useMemo(
+    () => Array.from({ length: Math.max(0, totalRequests) }, (_, idx) => BigInt(idx + 1)),
+    [totalRequests]
+  );
+
+  const { data: assetIdRows } = useReadContracts({
+    contracts: hasPerAssetFactory
+      ? requestIds.map((requestId) => ({
+          address: ADDRESSES.DiligencePortal as `0x${string}`,
+          abi: DiligencePortalABI,
+          functionName: "assetIdForRequest",
+          args: [requestId],
+        }))
+      : [],
+    query: { enabled: hasPerAssetFactory && requestIds.length > 0, refetchInterval: 8_000 },
+  });
+
+  const uniqueAssetIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const row of assetIdRows ?? []) {
+      const assetId = row?.result as string | undefined;
+      if (!assetId || !/^0x[0-9a-fA-F]{64}$/.test(assetId)) continue;
+      if (assetId.toLowerCase() === ZERO_BYTES32) continue;
+      ids.add(assetId.toLowerCase());
+    }
+    return Array.from(ids) as `0x${string}`[];
+  }, [assetIdRows]);
+
+  const { data: vaultLookupRows } = useReadContracts({
+    contracts: hasPerAssetFactory
+      ? uniqueAssetIds.map((assetId) => ({
+          address: ADDRESSES.RWAVaultFactory as `0x${string}`,
+          abi: RWAVaultFactoryABI,
+          functionName: "vaultByAssetId",
+          args: [assetId],
+        }))
+      : [],
+    query: { enabled: hasPerAssetFactory && uniqueAssetIds.length > 0, refetchInterval: 8_000 },
+  });
+
+  const uniqueVaultAddresses = useMemo(() => {
+    const vaults = new Set<string>();
+    for (const row of vaultLookupRows ?? []) {
+      const vault = row?.result as string | undefined;
+      if (!vault || !/^0x[0-9a-fA-F]{40}$/.test(vault)) continue;
+      if (vault.toLowerCase() === ZERO_ADDRESS.toLowerCase()) continue;
+      vaults.add(vault.toLowerCase());
+    }
+    return Array.from(vaults) as `0x${string}`[];
+  }, [vaultLookupRows]);
+
+  const { data: perVaultRows } = useReadContracts({
+    contracts: uniqueVaultAddresses.flatMap((vault) => [
+      { address: vault, abi: RWAVaultABI, functionName: "totalAssets" as const },
+      { address: vault, abi: RWAVaultABI, functionName: "totalSupply" as const },
+    ]),
+    query: { enabled: uniqueVaultAddresses.length > 0, refetchInterval: 8_000 },
+  });
+
+  const { perAssetTotalAssets, perAssetTotalShares } = useMemo(() => {
+    let assets = 0n;
+    let shares = 0n;
+    const rows = perVaultRows ?? [];
+    for (let idx = 0; idx < rows.length; idx += 2) {
+      const assetsVal = rows[idx]?.result as bigint | undefined;
+      const sharesVal = rows[idx + 1]?.result as bigint | undefined;
+      if (typeof assetsVal === "bigint") assets += assetsVal;
+      if (typeof sharesVal === "bigint") shares += sharesVal;
+    }
+    return { perAssetTotalAssets: assets, perAssetTotalShares: shares };
+  }, [perVaultRows]);
+
+  const hasPerAssetAggregation = uniqueVaultAddresses.length > 0;
+  const effectiveTotalAssets = hasPerAssetAggregation
+    ? perAssetTotalAssets
+    : ((vaultTotalAssets as bigint) ?? 0n);
+  const effectiveTotalShares = hasPerAssetAggregation
+    ? perAssetTotalShares
+    : ((vaultTotalSupply as bigint) ?? 0n);
+
   const protocolAgentIds = [repAgentId, valAgentId]
     .filter((id): id is bigint => typeof id === "bigint" && id > 0n)
     .map((id) => id.toString());
   const totalAgents = new Set(protocolAgentIds).size;
-  const tvl = vaultTotalAssets ? formatUnits(vaultTotalAssets as bigint, 6) : "0";
-  const shares = vaultTotalSupply ? formatUnits(vaultTotalSupply as bigint, 6) : "0";
+  const tvl = formatUnits(effectiveTotalAssets, 6);
+  const shares = formatUnits(effectiveTotalShares, 6);
 
   return (
     <div className="space-y-8">
@@ -108,10 +197,17 @@ export default function Dashboard() {
           <Stat label="Diligence Requests" value={totalRequests.toString()} accent="accent" />
         </Card>
         <Card>
-          <Stat label="Vault TVL (dUSD)" value={tvl} accent="success" />
+          <Stat
+            label={hasPerAssetAggregation ? "Vault TVL (All Assets)" : "Vault TVL (dUSD)"}
+            value={tvl}
+            accent="success"
+          />
         </Card>
         <Card>
-          <Stat label="Vault Shares" value={shares} />
+          <Stat
+            label={hasPerAssetAggregation ? "Vault Shares (All Assets)" : "Vault Shares"}
+            value={shares}
+          />
         </Card>
         <Card>
           <Stat label="ERC-8004 Agents" value={totalAgents.toString()} accent="warning" />

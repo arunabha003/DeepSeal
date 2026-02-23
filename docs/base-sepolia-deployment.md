@@ -8,14 +8,14 @@ This flow runs the full protocol on **real Base Sepolia** using CRE staging simu
 
 | Contract | Address | Basescan |
 |---|---|---|
-| DemoUSD | `0x523E3033F844B1E2175183846ADFD7190EDECD4a` | [View](https://sepolia.basescan.org/address/0x523E3033F844B1E2175183846ADFD7190EDECD4a) |
-| ComplianceRegistry | `0x78383225EA842251361CE7104456322d4d151D66` | [View](https://sepolia.basescan.org/address/0x78383225EA842251361CE7104456322d4d151D66) |
-| DiligencePortal | `0xa5A29714cb9c51A10a165cBe2025372640abb9e5` | [View](https://sepolia.basescan.org/address/0xa5A29714cb9c51A10a165cBe2025372640abb9e5) |
-| RWAComplianceReceiver | `0x16b1D017F22F2aB47bA3eA1948ff973A024CCB4F` | [View](https://sepolia.basescan.org/address/0x16b1D017F22F2aB47bA3eA1948ff973A024CCB4F) |
-| RWAVault | `0x65054D2De227b7e823a0c13fc0C5D6c62198963d` | [View](https://sepolia.basescan.org/address/0x65054D2De227b7e823a0c13fc0C5D6c62198963d) |
+| DemoUSD | `0x0a613896f3A69d7DA53e9c2503F01283966223C1` | [View](https://sepolia.basescan.org/address/0x0a613896f3A69d7DA53e9c2503F01283966223C1) |
+| ComplianceRegistry | `0xa47749699925e9187906f5A0361D5073397279b3` | [View](https://sepolia.basescan.org/address/0xa47749699925e9187906f5A0361D5073397279b3) |
+| DiligencePortal | `0xe6257bd26941cB6C3B977Fe2b2859aE7180396a4` | [View](https://sepolia.basescan.org/address/0xe6257bd26941cB6C3B977Fe2b2859aE7180396a4) |
+| RWAComplianceReceiver | `0x48935538CEbdb57b7B75D2476DC6C9b3A1cceDD6` | [View](https://sepolia.basescan.org/address/0x48935538CEbdb57b7B75D2476DC6C9b3A1cceDD6) |
+| RWAVault | `0x15FfbD328C9A0280027E04503A3F15b6bdea91e5` | [View](https://sepolia.basescan.org/address/0x15FfbD328C9A0280027E04503A3F15b6bdea91e5) |
 | IdentityRegistry | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | [View](https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) |
 | ReputationRegistry | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | [View](https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713) |
-| ValidationRegistry | `0xa30004dfA091b5bD9B019Fa31b490847929555EC` | [View](https://sepolia.basescan.org/address/0xa30004dfA091b5bD9B019Fa31b490847929555EC) |
+| ValidationRegistry | `0x7Ee89Ce38ece271262409210f2223205E3D76949` | [View](https://sepolia.basescan.org/address/0x7Ee89Ce38ece271262409210f2223205E3D76949) |
 
 > **IdentityRegistry and ReputationRegistry are the official ERC-8004 registries** deployed by the 8004 team, shared across all projects on the chain.
 
@@ -108,6 +108,7 @@ Required `services/kyb-provider/.env` fields:
 - `SUMSUB_APP_TOKEN=<your_app_token>`
 - `SUMSUB_SECRET_KEY=<your_secret_key>`
 - `SUMSUB_LEVEL_NAME=<your_business_level_name>`
+- `DOC_RESOLVER_IPFS_GATEWAY=https://<your-pinata-gateway>/ipfs` (recommended; avoids public gateway timeouts)
 - `PII_REDACTOR_API_KEY=<optional_shared_key_for_/pii/redact>`
 - `AUDIT_WEBHOOK_API_KEY=<optional_shared_key_for_/audit/webhook>`
 
@@ -164,7 +165,7 @@ Use any pinning provider. Example with Pinata:
 ```bash
 export RPC_URL=https://sepolia.base.org
 export PRIVATE_KEY=<DEPLOYER_PRIVATE_KEY>
-export PORTAL_ADDRESS=0xa5A29714cb9c51A10a165cBe2025372640abb9e5
+export PORTAL_ADDRESS=0xe6257bd26941cB6C3B977Fe2b2859aE7180396a4
 export SUBJECT=0x28ea4eF61ac4cca3ed6a64dBb5b2D4be1aDC9814
 export METADATA_URI=ipfs://<CID>/<filename>.json
 
@@ -203,16 +204,19 @@ Expected output includes:
 - KYB check via x402 paywall → APPROVED (if `FORCE_APPROVE=true`)
 - PII redaction step via confidential HTTP (`PII redaction completed ... redactionHash=0x...`)
 - x402 settlement trace with a real payment tx hash (`x402 payment settled txHash=0x...`)
-- Gemini LLM risk analysis → risk score
+- Gemini LLM risk analysis over redacted payload (standard HTTPS) → risk score
 - On-chain write to ComplianceRegistry via RWAComplianceReceiver
 - Confidential audit sink delivery (`Audit webhook delivered via confidential HTTP ...`)
 - `providerStatus`, `providerScore`, and `x402TxHash` in `Workflow Simulation Result`
 - `txHash: "simulation-no-txhash"` (normal for CRE simulation mode)
 
+> Note: Gemini is intentionally called via regular HTTPS after PII redaction to stay under CRE's current 5-call ConfidentialHTTP limit.
+> For hackathon demos only, you can set `demoForceApproveOnKyb=true` in `config.staging.json` to force final approval when KYB is `APPROVED`.
+
 ## 7) Verify on-chain outcome
 
 ```bash
-REGISTRY=0x78383225EA842251361CE7104456322d4d151D66
+REGISTRY=0xa47749699925e9187906f5A0361D5073397279b3
 SUBJECT=0x28ea4eF61ac4cca3ed6a64dBb5b2D4be1aDC9814
 
 cast call $REGISTRY "isApproved(address)(bool)" $SUBJECT --rpc-url https://sepolia.base.org
@@ -248,10 +252,10 @@ Key pages:
 
 | What | Link |
 |---|---|
-| ComplianceRegistry | https://sepolia.basescan.org/address/0x78383225EA842251361CE7104456322d4d151D66 |
+| ComplianceRegistry | https://sepolia.basescan.org/address/0xa47749699925e9187906f5A0361D5073397279b3 |
 | IdentityRegistry (official) | https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e |
 | ReputationRegistry (official) | https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713 |
-| ValidationRegistry | https://sepolia.basescan.org/address/0xa30004dfA091b5bD9B019Fa31b490847929555EC |
+| ValidationRegistry | https://sepolia.basescan.org/address/0x7Ee89Ce38ece271262409210f2223205E3D76949 |
 | 8004scan | https://8004scan.vercel.app |
 
 ---

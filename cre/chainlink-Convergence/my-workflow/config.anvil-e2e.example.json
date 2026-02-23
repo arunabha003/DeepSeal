@@ -19,5 +19,6 @@
   "auditWebhookEnabled": true,
   "auditWebhookRequired": false,
   "enforceSensitiveConfidential": false,
+  "demoForceApproveOnKyb": false,
   "_comment": "Addresses are auto-filled after deploy by: node tools/sync-cre-config.mjs --chain-id 84532 --config <this-file>"
 }

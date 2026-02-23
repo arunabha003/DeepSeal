@@ -160,12 +160,14 @@ Current runtime path:
 3. Resolve and parse metadata/doc bundle.
 4. Run KYB against provider (`/kyb/free` or `/kyb` with x402).
 5. Run PII redaction (`/pii/redact`) over the Gemini input payload.
-6. Run Gemini analysis on redacted payload.
+6. Run Gemini analysis on the redacted payload over regular HTTPS.
 7. Merge decisions and compute final report fields.
 8. Write report to on-chain receiver path.
 9. Send confidential audit event (`/audit/webhook`).
 
-When `useConfidentialHttp=true`, document resolution, KYB, and Gemini calls run through `ConfidentialHTTPClient`; otherwise they use standard `HTTPClient`.
+For demos, the workflow also supports `demoForceApproveOnKyb=true`: if KYB is `APPROVED`, final approval is forced even when Gemini rejects. This should stay disabled in production.
+
+When `useConfidentialHttp=true`, document resolution, KYB, PII redaction, and audit delivery run through `ConfidentialHTTPClient`; Gemini remains on standard HTTPS because the payload is already redacted and CRE enforces a 5-call ConfidentialHTTP cap per workflow run.
 The workflow is observable via `runtime.log()` and exposed to the frontend processing page through streaming output.
 
 ### 2.6 KYB Provider + Sumsub
@@ -185,7 +187,7 @@ This makes KYB usage metered and machine-payable.
 
 ### 2.8 Gemini Risk Scoring
 
-Gemini receives structured business context and KYB outputs, then returns a machine-readable risk verdict (`approved`, score, reasons). Workflow-side fallback logic handles unavailable model cases and keeps processing resilient.
+Gemini receives only redacted business context and KYB outputs, then returns a machine-readable risk verdict (`approved`, score, reasons). Workflow-side fallback logic handles unavailable model cases and keeps processing resilient.
 
 ### 2.9 ERC-8004 Layer
 
@@ -211,5 +213,6 @@ The frontend is not just a form UI; it is also the operator console. Submit, pro
 
 - Local CRE simulation may show non-final tx hash values in logs; validate state through on-chain reads.
 - If CRE linked secrets are unavailable in an org, local config fallback tooling is used.
+- CRE currently caps Confidential HTTP calls at 5 per workflow execution; DeepSeal keeps Gemini on standard HTTPS (post-redaction) to stay within this limit.
 - On Base Sepolia fork mode, EIP-7702 delegated account code may need clearing before x402 USDC signature paths.
 - Sumsub sandbox outcomes can require explicit sandbox transition APIs for deterministic demo paths.

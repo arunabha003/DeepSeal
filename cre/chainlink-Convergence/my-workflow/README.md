@@ -54,6 +54,7 @@ Then edit the selected file:
   - `useConfidentialHttp` (explicit Confidential HTTP client)
   - `enforceSensitiveConfidential` (default true outside local mode; blocks non-confidential sensitive paths)
   - `x402Enabled` (should match whether KYB is paywalled on `POST /kyb`)
+  - `demoForceApproveOnKyb` (demo-only override: if KYB is APPROVED, force final approval even when Gemini rejects)
   - `auditWebhookEnabled` / `auditWebhookRequired`
   - `geminiApiKey` / `x402BuyerPrivateKey` (local simulation fallback when CRE secrets are not linked)
   - `docResolverApiKey`, `piiRedactorApiKey`, `auditWebhookApiKey` (optional shared keys for provider endpoints)
@@ -62,12 +63,14 @@ The real config files are gitignored and intended to be per-user/per-environment
 
 ## x402 + Confidential HTTP
 - x402 buyer retries are implemented for both HTTP client paths.
-- When `useConfidentialHttp=true`, the workflow runs **all sensitive offchain calls** via `ConfidentialHTTPClient`:
+- When `useConfidentialHttp=true`, the workflow runs sensitive offchain calls via `ConfidentialHTTPClient`:
   - document resolver (`/docs/resolve`)
   - KYB provider (`/kyb`)
-  - Gemini risk scoring (`generativelanguage.googleapis.com`)
 - PII redaction runs through Confidential HTTP (`/pii/redact`) before Gemini prompt construction.
+- Gemini risk scoring runs over standard HTTPS using the redacted payload.
 - Audit delivery runs through Confidential HTTP (`/audit/webhook`) with enriched workflow outcome payload.
+- This split is intentional to stay under CRE's current 5-call ConfidentialHTTP limit per workflow execution.
+- If `demoForceApproveOnKyb=true`, workflow logs `Demo override active` and final approval is forced for KYB-approved requests (for demos only).
 - For paid mode, set:
   - workflow `kybUrl` to `/kyb`
   - `x402Enabled=true`

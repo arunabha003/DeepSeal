@@ -57,6 +57,7 @@ const configSchema = z.object({
 	enforceSensitiveConfidential: z.boolean().optional(),
 	useConfidentialHttp: z.boolean().optional(),
 	x402Enabled: z.boolean().optional(),
+	demoForceApproveOnKyb: z.boolean().optional(),
 })
 
 type Config = z.infer<typeof configSchema>
@@ -1342,40 +1343,43 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 
 	const apiKey = getRequiredSecret(runtime, 'GEMINI_API_KEY')
 
-	const geminiRisk = useConf
-		? new ConfidentialHTTPClient()
-				.sendRequest(
-					runtime,
-					(sr: ConfidentialHTTPSendRequester, cfg: Config) =>
-						fetchGeminiRiskConfidential(sr, cfg, apiKey, prompt, runtime),
-					ConsensusAggregationByFields<RiskObservation>({
-						approved: identical,
-						riskScore: median,
-						reasonsText: identical,
-					}),
-				)(runtime.config)
-				.result()
-		: new HTTPClient()
-				.sendRequest(
-					runtime,
-					(sr: HTTPSendRequester, cfg: Config) => fetchGeminiRisk(sr, cfg, apiKey, prompt, runtime),
-					ConsensusAggregationByFields<RiskObservation>({
-						approved: identical,
-						riskScore: median,
-						reasonsText: identical,
-					}),
-				)(runtime.config)
-				.result()
+	// Gemini uses regular HTTP even in confidential mode:
+	// - prompt data is already PII-redacted
+	// - Gemini is a public API over HTTPS
+	// - saves a ConfidentialHTTP slot (CRE limit = 5 per workflow)
+	const geminiRisk = new HTTPClient()
+		.sendRequest(
+			runtime,
+			(sr: HTTPSendRequester, cfg: Config) => fetchGeminiRisk(sr, cfg, apiKey, prompt, runtime),
+			ConsensusAggregationByFields<RiskObservation>({
+				approved: identical,
+				riskScore: median,
+				reasonsText: identical,
+			}),
+		)(runtime.config)
+		.result()
 
-	const approved = Boolean(geminiRisk.approved && kyb.providerStatus === 'APPROVED')
-	const riskScore = Math.max(0, Math.min(1000, Math.floor(geminiRisk.riskScore)))
+	const geminiApproved = Boolean(geminiRisk.approved)
+	const forceApproveOnKyb = Boolean(runtime.config.demoForceApproveOnKyb)
+	let approved = Boolean(geminiApproved && kyb.providerStatus === 'APPROVED')
+	let riskScore = Math.max(0, Math.min(1000, Math.floor(geminiRisk.riskScore)))
+	let reasons = JSON.parse(geminiRisk.reasonsText) as string[]
+	if (forceApproveOnKyb && kyb.providerStatus === 'APPROVED' && !approved) {
+		approved = true
+		riskScore = Math.min(riskScore, 300)
+		reasons = [
+			...reasons,
+			'Demo override applied: KYB-approved request promoted to approved (demoForceApproveOnKyb=true).',
+		]
+		runtime.log('Demo override active: force-approving because KYB returned APPROVED.')
+	}
 	runtime.log(`Gemini AI result approved=${geminiRisk.approved} riskScore=${geminiRisk.riskScore} reasons=${geminiRisk.reasonsText}`)
-	runtime.log(`Final decision approved=${approved} riskScore=${riskScore} (KYB=${kyb.providerStatus}, Gemini=${geminiRisk.approved})`)
+	runtime.log(`Final decision approved=${approved} riskScore=${riskScore} (KYB=${kyb.providerStatus}, Gemini=${geminiApproved})`)
 
 	const normalizedRisk: RiskJson = {
 		approved,
 		riskScore,
-		reasons: JSON.parse(geminiRisk.reasonsText) as string[],
+		reasons,
 	}
 
 	const reportJson = JSON.stringify(normalizedRisk)

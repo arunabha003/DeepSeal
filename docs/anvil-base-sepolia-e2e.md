@@ -57,7 +57,7 @@ SUMSUB_LEVEL_NAME=<your_sumsub_level_name>
 
 # Document resolver settings (secure metadataUri ingestion)
 DOC_RESOLVER_API_KEY=<optional_shared_key>
-DOC_RESOLVER_IPFS_GATEWAY=https://ipfs.io/ipfs
+DOC_RESOLVER_IPFS_GATEWAY=https://<your-pinata-gateway>/ipfs
 DOC_RESOLVER_ALLOW_INSECURE_HTTP=true
 PII_REDACTOR_API_KEY=<optional_shared_key_for_/pii/redact>
 AUDIT_WEBHOOK_API_KEY=<optional_shared_key_for_/audit/webhook>
@@ -217,7 +217,12 @@ Expected in local simulate:
 - `Workflow Simulation Result` includes `extractionHash` and `documentSourceHash` proving document-derived processing.
 - `Workflow Simulation Result` includes `providerStatus`, `providerScore`, and `x402TxHash` for KYB + payment traceability.
 - Runtime logs include `PII redaction completed ... redactionHash=0x...`.
+- Runtime logs include `Starting Gemini AI risk assessment ...` and decision output from redacted payload.
 - Runtime logs include `Audit webhook delivered via confidential HTTP ...` when audit sink is enabled.
+
+> Use a dedicated IPFS gateway (Pinata/web3.storage/etc.) for `DOC_RESOLVER_IPFS_GATEWAY`; public `ipfs.io` can timeout during demos.
+> Gemini runs over standard HTTPS after redaction to stay within CRE's 5-call ConfidentialHTTP limit.
+> If Gemini keeps rejecting demo data, set `demoForceApproveOnKyb=true` in `config.anvil-e2e.json` (demo-only override).
 
 ## 10) Verify on-chain outcome
 ```bash

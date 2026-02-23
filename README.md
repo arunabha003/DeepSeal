@@ -55,9 +55,9 @@ One CRE workflow execution reads an on-chain request, resolves an IPFS document 
 |---|---|---|
 | Orchestration | **Chainlink CRE** | Runs the end-to-end due-diligence workflow and writes the final report on-chain via `EVMClient.writeReport()`. |
 | Payment Rail | **x402** | Handles KYB endpoint micropayments (402 challenge → signed USDC transfer auth → retry). |
-| Privacy Controls | **Confidential HTTP** | Runs sensitive calls (doc resolve, KYB, PII redaction, Gemini, audit sink) offchain with protected secrets/inputs. |
+| Privacy Controls | **Confidential HTTP** | Runs sensitive calls (doc resolve, KYB, PII redaction, audit sink) offchain with protected secrets/inputs. |
 | Verification | **Sumsub (KYB)** | Returns business verification outcome and provider risk signal. |
-| Risk Engine | **Google Gemini** | Produces structured `{ approved, riskScore, reasons[] }` output from extracted company context. |
+| Risk Engine | **Google Gemini** | Produces structured `{ approved, riskScore, reasons[] }` output from PII-redacted company context over standard HTTPS. |
 | Audit Trail (Offchain) | **Confidential Audit Sink** | Receives private completion payloads (`requestId`, hashes, decision, x402 tx hash) for compliance logging. |
 | Attestation | **EAS** | Stores immutable on-chain compliance proof for each finalized decision. |
 | Agent Trust | **ERC-8004** | Tracks agent identity + reputation + validation artifacts (Agents `#916`, `#917`). |
@@ -71,12 +71,12 @@ One CRE workflow execution reads an on-chain request, resolves an IPFS document 
 
 | Contract | Address |
 |---|---|
-| DemoUSD | [`0x523E3033F844B1E2175183846ADFD7190EDECD4a`](https://sepolia.basescan.org/address/0x523E3033F844B1E2175183846ADFD7190EDECD4a) |
-| ComplianceRegistry | [`0x78383225EA842251361CE7104456322d4d151D66`](https://sepolia.basescan.org/address/0x78383225EA842251361CE7104456322d4d151D66) |
-| DiligencePortal | [`0xa5A29714cb9c51A10a165cBe2025372640abb9e5`](https://sepolia.basescan.org/address/0xa5A29714cb9c51A10a165cBe2025372640abb9e5) |
-| RWAComplianceReceiver | [`0x16b1D017F22F2aB47bA3eA1948ff973A024CCB4F`](https://sepolia.basescan.org/address/0x16b1D017F22F2aB47bA3eA1948ff973A024CCB4F) |
-| RWAVault | [`0x65054D2De227b7e823a0c13fc0C5D6c62198963d`](https://sepolia.basescan.org/address/0x65054D2De227b7e823a0c13fc0C5D6c62198963d) |
-| ValidationRegistry | [`0xa30004dfA091b5bD9B019Fa31b490847929555EC`](https://sepolia.basescan.org/address/0xa30004dfA091b5bD9B019Fa31b490847929555EC) |
+| DemoUSD | [`0x0a613896f3A69d7DA53e9c2503F01283966223C1`](https://sepolia.basescan.org/address/0x0a613896f3A69d7DA53e9c2503F01283966223C1) |
+| ComplianceRegistry | [`0xa47749699925e9187906f5A0361D5073397279b3`](https://sepolia.basescan.org/address/0xa47749699925e9187906f5A0361D5073397279b3) |
+| DiligencePortal | [`0xe6257bd26941cB6C3B977Fe2b2859aE7180396a4`](https://sepolia.basescan.org/address/0xe6257bd26941cB6C3B977Fe2b2859aE7180396a4) |
+| RWAComplianceReceiver | [`0x48935538CEbdb57b7B75D2476DC6C9b3A1cceDD6`](https://sepolia.basescan.org/address/0x48935538CEbdb57b7B75D2476DC6C9b3A1cceDD6) |
+| RWAVault | [`0x15FfbD328C9A0280027E04503A3F15b6bdea91e5`](https://sepolia.basescan.org/address/0x15FfbD328C9A0280027E04503A3F15b6bdea91e5) |
+| ValidationRegistry | [`0x7Ee89Ce38ece271262409210f2223205E3D76949`](https://sepolia.basescan.org/address/0x7Ee89Ce38ece271262409210f2223205E3D76949) |
 | IdentityRegistry *(official ERC-8004)* | [`0x8004A818BFB912233c491871b3d84c89A494BD9e`](https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) |
 | ReputationRegistry *(official ERC-8004)* | [`0x8004B663056A597Dffe9eCcC1965A193B7388713`](https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713) |
 | EAS Contract *(Base native)* | [`0x4200000000000000000000000000000000000021`](https://sepolia.basescan.org/address/0x4200000000000000000000000000000000000021) |
@@ -112,7 +112,7 @@ CRE is the deterministic execution layer between off-chain evidence and on-chain
 3. Workflow resolves + verifies document bundle.
 4. Workflow executes KYB call (paid x402 path when enabled).
 5. Workflow redacts PII via Confidential HTTP before LLM inference.
-6. Workflow computes AI risk output (Gemini structured JSON).
+6. Workflow computes AI risk output (Gemini structured JSON) over regular HTTPS on redacted payload.
 7. Workflow merges outputs under policy constraints.
 8. Workflow writes canonical report to `RWAComplianceReceiver`.
 9. Workflow sends confidential audit payload to private sink.
@@ -152,6 +152,9 @@ cp app/.env.local.example app/.env.local
 
 Fill secrets in those copied files (`.env`, `services/kyb-provider/.env`, `cre/.../.env`, `app/.env.local`).
 
+For IPFS reliability, set `DOC_RESOLVER_IPFS_GATEWAY` in `services/kyb-provider/.env` to your pinning gateway (for example, your Pinata gateway) instead of default public gateways.
+For demo-only approval flow, set `demoForceApproveOnKyb=true` in your workflow config (`config.anvil-e2e.json` / `config.staging.json`).
+
 ### 3) Optional Sumsub sanity checks
 
 ```bash
@@ -176,6 +179,7 @@ cd app && npm run dev
 1. Open `http://localhost:3000/submit` and create request.
 2. Open `http://localhost:3000/process` and run CRE workflow.
 3. Watch live SSE steps for KYB, AI scoring, and on-chain write.
+   - This mode broadcasts a real `RWAComplianceReceiver.onReport()` transaction and shows the tx hash.
 4. Validate output in `http://localhost:3000/compliance`.
 5. Test vault behavior in `http://localhost:3000/vault`.
 6. Inspect agents in `http://localhost:3000/agents`.
