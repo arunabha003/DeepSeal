@@ -421,8 +421,14 @@ export function WorkflowMonitor({
                               /^0x[0-9a-fA-F]{64}$/.test(step.data.x402TxHash) && (
                                 <div className="col-span-2">
                                   <span className="text-muted block">Payment Tx</span>
+                                  {(() => {
+                                    const explicitUrl =
+                                      typeof step.data.x402TxUrl === "string" && step.data.x402TxUrl.length > 0
+                                        ? step.data.x402TxUrl
+                                        : txUrl(step.data.x402TxHash);
+                                    return (
                                   <a
-                                    href={txUrl(step.data.x402TxHash)}
+                                    href={explicitUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="font-mono text-accent hover:underline inline-flex items-center gap-0.5"
@@ -430,6 +436,8 @@ export function WorkflowMonitor({
                                     {step.data.x402TxHash.slice(0, 10)}...{step.data.x402TxHash.slice(-8)}
                                     <span className="text-[9px]">↗</span>
                                   </a>
+                                    );
+                                  })()}
                                 </div>
                               )}
                             <div className="col-span-2">

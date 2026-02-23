@@ -385,6 +385,7 @@ export async function POST(req: NextRequest) {
               const match = trimmed.match(/txHash=(0x[0-9a-fA-F]{64})/);
               if (match?.[1]) {
                 kybX402TxHash = match[1];
+                const x402TxUrl = `https://sepolia.basescan.org/tx/${kybX402TxHash}`;
                 send("step", {
                   id: "kyb",
                   status: "complete",
@@ -401,6 +402,7 @@ export async function POST(req: NextRequest) {
                     ...(X402_PAYER ? { x402Payer: X402_PAYER } : {}),
                     ...(X402_PAY_TO ? { x402PayTo: X402_PAY_TO } : {}),
                     x402TxHash: kybX402TxHash,
+                    x402TxUrl,
                     x402Scheme: "exact",
                     x402Protocol: "EIP-3009 (transferWithAuthorization)",
                   },
@@ -599,6 +601,7 @@ export async function POST(req: NextRequest) {
                 ...(X402_PAYER ? { x402Payer: X402_PAYER } : {}),
                 ...(X402_PAY_TO ? { x402PayTo: X402_PAY_TO } : {}),
                 x402TxHash: finalX402TxHash,
+                x402TxUrl: `https://sepolia.basescan.org/tx/${finalX402TxHash}`,
                 x402Scheme: "exact",
                 x402Protocol: "EIP-3009 (transferWithAuthorization)",
               },
