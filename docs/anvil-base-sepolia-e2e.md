@@ -212,6 +212,7 @@ cre workflow simulate ./my-workflow \
 Expected in local simulate:
 - `Workflow Simulation Result` includes `txHash: "simulation-no-txhash"` (this is normal in local simulation mode).
 - `Workflow Simulation Result` includes `extractionHash` and `documentSourceHash` proving document-derived processing.
+- `Workflow Simulation Result` includes `providerStatus`, `providerScore`, and `x402TxHash` for KYB + payment traceability.
 
 ## 10) Verify on-chain outcome
 ```bash

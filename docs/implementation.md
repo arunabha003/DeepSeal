@@ -161,6 +161,7 @@ Current runtime path:
 6. Merge decisions and compute final report fields.
 7. Write report to on-chain receiver path.
 
+When `useConfidentialHttp=true`, document resolution, KYB, and Gemini calls run through `ConfidentialHTTPClient`; otherwise they use standard `HTTPClient`.
 The workflow is observable via `runtime.log()` and exposed to the frontend processing page through streaming output.
 
 ### 2.6 KYB Provider + Sumsub
