@@ -166,6 +166,9 @@ const sumsubToken = process.env.SUMSUB_APP_TOKEN
 const sumsubSecret = process.env.SUMSUB_SECRET_KEY || process.env.SUMSUB_SECRET
 const sumsubLevelName = process.env.SUMSUB_LEVEL_NAME
 const docResolverApiKey = String(process.env.DOC_RESOLVER_API_KEY || '').trim()
+const piiRedactorApiKey = String(process.env.PII_REDACTOR_API_KEY || '').trim()
+const auditWebhookApiKey = String(process.env.AUDIT_WEBHOOK_API_KEY || '').trim()
+const auditWebhookLogBody = String(process.env.AUDIT_WEBHOOK_LOG_BODY || 'false').toLowerCase() === 'true'
 const docResolverIpfsGateway = String(process.env.DOC_RESOLVER_IPFS_GATEWAY || 'https://ipfs.io/ipfs').replace(/\/+$/, '')
 const docResolverAllowInsecureHttp = String(process.env.DOC_RESOLVER_ALLOW_INSECURE_HTTP || 'false').toLowerCase() === 'true'
 const docResolverTimeoutMs = Number(process.env.DOC_RESOLVER_TIMEOUT_MS || 15000)
@@ -186,6 +189,75 @@ const canonicalStringify = (value) => {
   const entries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b))
   const body = entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalStringify(v)}`).join(',')
   return `{${body}}`
+}
+
+const piiKeyHints = new Set([
+  'email',
+  'phone',
+  'dob',
+  'birthdate',
+  'firstName',
+  'lastName',
+  'fullName',
+  'address',
+  'documentNumber',
+  'passport',
+  'passportNumber',
+  'taxId',
+  'tin',
+  'ssn',
+])
+
+const redactStringValue = (input) => {
+  if (typeof input !== 'string') return { value: input, redacted: false }
+  let value = input
+  let redacted = false
+  const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi
+  const phonePattern = /(?:\+?\d[\d\s().-]{6,}\d)/g
+  if (emailPattern.test(value)) {
+    value = value.replace(emailPattern, '[REDACTED_EMAIL]')
+    redacted = true
+  }
+  if (phonePattern.test(value)) {
+    value = value.replace(phonePattern, '[REDACTED_PHONE]')
+    redacted = true
+  }
+  return { value, redacted }
+}
+
+const redactPayload = (input, parentPath = '$') => {
+  const redactedFields = []
+
+  const walk = (value, path) => {
+    if (Array.isArray(value)) {
+      return value.map((entry, idx) => walk(entry, `${path}[${idx}]`))
+    }
+
+    if (value && typeof value === 'object') {
+      const out = {}
+      for (const [key, child] of Object.entries(value)) {
+        const childPath = `${path}.${key}`
+        if (piiKeyHints.has(key)) {
+          redactedFields.push(childPath)
+          out[key] = `[REDACTED_${key.toUpperCase()}]`
+          continue
+        }
+        out[key] = walk(child, childPath)
+      }
+      return out
+    }
+
+    if (typeof value === 'string') {
+      const { value: masked, redacted } = redactStringValue(value)
+      if (redacted) redactedFields.push(path)
+      return masked
+    }
+
+    return value
+  }
+
+  const redactedPayload = walk(input, parentPath)
+  return { redactedPayload, redactedFields }
 }
 
 const normalizeCompanyInfo = (candidate) => {
@@ -475,6 +547,55 @@ app.post('/docs/resolve', async (req, res) => {
     const docBundleHash = req.body?.docBundleHash
     const resolved = await resolveAndExtractDocumentBundle({ metadataUri, docBundleHash })
     return res.status(200).json(resolved)
+  } catch (e) {
+    return res.status(400).json({ error: String(e?.message || e) })
+  }
+})
+
+app.post('/pii/redact', async (req, res) => {
+  try {
+    if (piiRedactorApiKey) {
+      const key = String(req.header('x-redactor-key') || '').trim()
+      if (key !== piiRedactorApiKey) {
+        return res.status(401).json({ error: 'Unauthorized redactor key' })
+      }
+    }
+
+    const payload = req.body?.payload
+    if (typeof payload === 'undefined') {
+      return res.status(400).json({ error: 'Missing payload' })
+    }
+
+    const { redactedPayload, redactedFields } = redactPayload(payload)
+    const redactionHash = keccak256(toHex(canonicalStringify(redactedPayload)))
+    return res.status(200).json({
+      redactedPayload,
+      redactionHash,
+      redactedFields,
+      containsPii: redactedFields.length > 0,
+    })
+  } catch (e) {
+    return res.status(400).json({ error: String(e?.message || e) })
+  }
+})
+
+app.post('/audit/webhook', async (req, res) => {
+  try {
+    if (auditWebhookApiKey) {
+      const key = String(req.header('x-audit-key') || '').trim()
+      if (key !== auditWebhookApiKey) {
+        return res.status(401).json({ error: 'Unauthorized audit key' })
+      }
+    }
+
+    const payload = req.body || {}
+    const eventHash = keccak256(toHex(canonicalStringify(payload)))
+    if (auditWebhookLogBody) {
+      console.log(`[audit-webhook] accepted eventHash=${eventHash} payload=${JSON.stringify(payload)}`)
+    } else {
+      console.log(`[audit-webhook] accepted eventHash=${eventHash} event=${String(payload?.event || 'unknown')}`)
+    }
+    return res.status(200).json({ ok: true, eventHash, receivedAt: new Date().toISOString() })
   } catch (e) {
     return res.status(400).json({ error: String(e?.message || e) })
   }
