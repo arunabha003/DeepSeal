@@ -83,6 +83,13 @@ cp cre/chainlink-Convergence/my-workflow/config.staging.example.json \
 cp app/.env.local.example app/.env.local
 ```
 
+In `config.staging.json`, keep these enabled for privacy-track behavior:
+- `"environment": "staging"`
+- `"useConfidentialHttp": true`
+- `"enforceSensitiveConfidential": true`
+- `"auditWebhookEnabled": true`
+- `"auditWebhookRequired": true`
+
 Fill in your API keys and private keys in each file. The `.example` files already contain testnet contract addresses — you only need to add secrets.
 
 ### Key secrets to fill
@@ -101,6 +108,8 @@ Required `services/kyb-provider/.env` fields:
 - `SUMSUB_APP_TOKEN=<your_app_token>`
 - `SUMSUB_SECRET_KEY=<your_secret_key>`
 - `SUMSUB_LEVEL_NAME=<your_business_level_name>`
+- `PII_REDACTOR_API_KEY=<optional_shared_key_for_/pii/redact>`
+- `AUDIT_WEBHOOK_API_KEY=<optional_shared_key_for_/audit/webhook>`
 
 Auth verification:
 

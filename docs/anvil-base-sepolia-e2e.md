@@ -59,6 +59,9 @@ SUMSUB_LEVEL_NAME=<your_sumsub_level_name>
 DOC_RESOLVER_API_KEY=<optional_shared_key>
 DOC_RESOLVER_IPFS_GATEWAY=https://ipfs.io/ipfs
 DOC_RESOLVER_ALLOW_INSECURE_HTTP=true
+PII_REDACTOR_API_KEY=<optional_shared_key_for_/pii/redact>
+AUDIT_WEBHOOK_API_KEY=<optional_shared_key_for_/audit/webhook>
+AUDIT_WEBHOOK_LOG_BODY=false
 ```
 
 ### `cre/chainlink-Convergence/.env`

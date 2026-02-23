@@ -54,6 +54,8 @@ This document is organized in two parts:
 - `POST /kyb` — x402-paywalled KYB verification
 - `POST /kyb/free` — non-paywalled KYB path (simulation/dev)
 - `POST /docs/resolve` — metadata/document resolution for workflow
+- `POST /pii/redact` — PII redaction pass for Gemini input payloads
+- `POST /audit/webhook` — confidential audit sink for workflow completion events
 - `GET /healthz` — service health
 - `GET /sumsub/healthz` — Sumsub auth health
 - `POST /sumsub/sandbox/testCompleted` — sandbox outcome helper
