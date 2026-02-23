@@ -99,7 +99,7 @@ Fill in your API keys and private keys in each file. The `.example` files alread
 | `.env` | `GEMINI_API_KEY` |
 | `services/kyb-provider/.env` | `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY`, `X402_PAY_TO`, `X402_RPC_URL`, `X402_RELAYER_PRIVATE_KEY` |
 | `cre/chainlink-Convergence/.env` | `CRE_ETH_PRIVATE_KEY`, `GEMINI_API_KEY`, `X402_BUYER_PRIVATE_KEY` |
-| `app/.env.local` | `DEPLOYER_PRIVATE_KEY`, `RPC_URL` |
+| `app/.env.local` | `DEPLOYER_PRIVATE_KEY`, `RPC_URL`, `NEXT_PUBLIC_CONFIDENTIAL_HTTP` |
 
 ### Sumsub setup (inlined)
 
