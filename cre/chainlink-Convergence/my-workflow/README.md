@@ -8,7 +8,7 @@ This workflow processes an onchain diligence request stored in `DiligencePortal`
 5) calling Gemini for a strict JSON risk decision
 6) writing the decision onchain via `EVMClient.writeReport` to `RWAComplianceReceiver`
 
-`RWAComplianceReceiver` then updates `ComplianceRegistry` and (if configured onchain) performs EAS + ERC-8004 side effects.
+`RWAComplianceReceiver` then updates `ComplianceRegistry`, syncs `RWAAssetRegistry`, can auto-create a per-request vault via `RWAVaultFactory`, and (if configured onchain) performs EAS + ERC-8004 side effects.
 
 ## 1) Configure RPCs
 `../project.yaml` contains RPCs used by local simulation. Default is a public Sepolia RPC.

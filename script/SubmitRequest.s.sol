@@ -17,6 +17,7 @@ contract SubmitRequest is Script {
 
         vm.startBroadcast(key);
         requestId = DiligencePortal(portalAddr).submit(subject, docBundleHash, metadataUri);
+        bytes32 assetId = DiligencePortal(portalAddr).assetIdForRequest(requestId);
         vm.stopBroadcast();
 
         console2.log("Portal:", portalAddr);
@@ -24,6 +25,6 @@ contract SubmitRequest is Script {
         console2.logBytes32(docBundleHash);
         console2.log("MetadataURI:", metadataUri);
         console2.log("RequestId:", requestId);
+        console2.logBytes32(assetId);
     }
 }
-

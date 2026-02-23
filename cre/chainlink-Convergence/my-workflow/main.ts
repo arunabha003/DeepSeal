@@ -1071,8 +1071,8 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 	const attestationHash = keccak256(concatHex([req.docBundleHash, extractionHash, providerHash, reportHash]))
 
 	const reportHex = encodeAbiParameters(
-		parseAbiParameters('address subject, bool approved, uint32 riskScore, bytes32 attestationHash'),
-		[req.subject, approved, riskScore, attestationHash],
+		parseAbiParameters('uint256 requestId, address subject, bool approved, uint32 riskScore, bytes32 attestationHash'),
+		[requestId, req.subject, approved, riskScore, attestationHash],
 	)
 
 	const tx = writeDecision(runtime, reportHex)

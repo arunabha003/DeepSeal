@@ -7,8 +7,10 @@ import {console2} from "forge-std/console2.sol";
 import {DemoUSD} from "../src/DemoUSD.sol";
 import {ComplianceRegistry} from "../src/ComplianceRegistry.sol";
 import {DiligencePortal} from "../src/DiligencePortal.sol";
+import {RWAAssetRegistry} from "../src/RWAAssetRegistry.sol";
 import {RWAComplianceReceiver} from "../src/RWAComplianceReceiver.sol";
 import {RWAVault} from "../src/RWAVault.sol";
+import {RWAVaultFactory} from "../src/RWAVaultFactory.sol";
 import {IdentityRegistry} from "../src/erc8004/IdentityRegistry.sol";
 import {ReputationRegistry} from "../src/erc8004/ReputationRegistry.sol";
 import {ValidationRegistry} from "../src/erc8004/ValidationRegistry.sol";
@@ -32,6 +34,7 @@ contract Deploy is Script {
         address easContract;
         bytes32 easSchemaUid;
         bool easRevocable;
+        bool autoCreateRwaVaults;
         uint256 seedAmount;
         bool useOfficialERC8004;
         address identityRegistryAddress;
@@ -52,6 +55,8 @@ contract Deploy is Script {
         RWAComplianceReceiver receiver;
         RWAVault vault;
         DiligencePortal portal;
+        RWAAssetRegistry assetRegistry;
+        RWAVaultFactory vaultFactory;
         IdentityRegistry identityRegistry;
         ReputationRegistry reputationRegistry;
         ValidationRegistry validationRegistry;
@@ -83,6 +88,7 @@ contract Deploy is Script {
         cfg.easContract = vm.envOr("EAS_ATTESTATION_CONTRACT", address(0));
         cfg.easSchemaUid = vm.envOr("EAS_SCHEMA_UID", bytes32(0));
         cfg.easRevocable = vm.envOr("EAS_REVOCABLE", true);
+        cfg.autoCreateRwaVaults = vm.envOr("AUTO_CREATE_RWA_VAULTS", true);
         cfg.seedAmount = vm.envOr("SEED_AMOUNT", uint256(1_000_000e6));
         cfg.useOfficialERC8004 = vm.envOr("USE_OFFICIAL_ERC8004", false);
         cfg.identityRegistryAddress = vm.envOr("ERC8004_IDENTITY_REGISTRY", address(0));
@@ -125,8 +131,15 @@ contract Deploy is Script {
         }
 
         out.registry.setWorkflowOperator(address(out.receiver));
-        out.vault = new RWAVault(out.asset, out.registry, "RWA Vault Share", "RWAV");
+        out.vault = new RWAVault(out.asset, out.registry, "DeepSeal Shared Vault", "DSVAULT");
         out.portal = new DiligencePortal();
+        out.assetRegistry = new RWAAssetRegistry(cfg.deployer, cfg.deployer);
+        out.vaultFactory = new RWAVaultFactory(cfg.deployer, out.asset, out.registry, cfg.deployer);
+        out.receiver.setRWAAssetPipeline(
+            address(out.portal), address(out.assetRegistry), address(out.vaultFactory), cfg.autoCreateRwaVaults
+        );
+        out.assetRegistry.setOperator(address(out.receiver));
+        out.vaultFactory.setOperator(address(out.receiver));
 
         if (cfg.identityRegistryAddress == address(0)) {
             out.identityRegistry = new IdentityRegistry();
@@ -250,6 +263,8 @@ contract Deploy is Script {
         console2.log("RWAComplianceReceiver:", address(out.receiver));
         console2.log("RWAVault:", address(out.vault));
         console2.log("DiligencePortal:", address(out.portal));
+        console2.log("RWAAssetRegistry:", address(out.assetRegistry));
+        console2.log("RWAVaultFactory:", address(out.vaultFactory));
         console2.log("ERC8004 IdentityRegistry:", address(out.identityRegistry));
         console2.log("ERC8004 ReputationRegistry:", address(out.reputationRegistry));
         console2.log("ERC8004 ValidationRegistry:", address(out.validationRegistry));

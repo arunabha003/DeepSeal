@@ -8,7 +8,7 @@ end-to-end compliance pipeline:
 3. **Extracts deterministic fields** (`companyInfo`) and records extraction provenance hashes
 4. **Calls KYB provider** (Sumsub sandbox) via x402 micropayment rail
 5. **Calls Gemini AI** for structured risk scoring with model auto-retry
-6. **Writes** the decision on-chain to `RWAComplianceReceiver.onReport()` → updates `ComplianceRegistry` + triggers ERC-8004 agent side effects
+6. **Writes** the decision on-chain to `RWAComplianceReceiver.onReport()` → updates `ComplianceRegistry`, syncs the per-request RWA asset record, auto-creates a per-asset ERC-4626 vault, and triggers ERC-8004 side effects
 
 ## Key Files
 
@@ -61,8 +61,8 @@ Optional (for x402 paid KYB path):
 ## Contracts the Workflow Writes To
 
 - **Function**: `RWAComplianceReceiver.onReport(bytes metadata, bytes report)`
-- **Report encoding**: `(address subject, bool approved, uint32 riskScore, bytes32 attestationHash)`
-- **Effect**: Updates `ComplianceRegistry` + triggers ERC-8004 reputation/validation + optional EAS attestation
+- **Report encoding**: `(uint256 requestId, address subject, bool approved, uint32 riskScore, bytes32 attestationHash)`
+- **Effect**: Updates `ComplianceRegistry` + upserts `RWAAssetRegistry` + auto-creates per-asset vault via `RWAVaultFactory` + triggers ERC-8004 reputation/validation + optional EAS attestation
 
 ## Trigger Options
 
