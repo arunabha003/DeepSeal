@@ -410,6 +410,32 @@ export async function POST(req: NextRequest) {
               }
             }
 
+            if (trimmed.includes("Starting PII redaction via")) {
+              send("step", {
+                id: "pii-redact",
+                status: "running",
+                label: "PII Redaction (Confidential HTTP)",
+                detail: "Masking sensitive fields before Gemini analysis...",
+              });
+            }
+
+            if (trimmed.includes("PII redaction completed")) {
+              const containsMatch = trimmed.match(/containsPii=(true|false)/);
+              const hashMatch = trimmed.match(/redactionHash=(0x[0-9a-fA-F]{64})/);
+              const redactorMatch = trimmed.match(/redactorUrl=(\S+)/);
+              send("step", {
+                id: "pii-redact",
+                status: "complete",
+                label: "PII Redaction (Confidential HTTP)",
+                detail: `Completed · containsPII=${containsMatch?.[1] || "unknown"}`,
+                data: {
+                  containsPii: containsMatch?.[1] === "true",
+                  redactionHash: hashMatch?.[1] || null,
+                  redactorUrl: redactorMatch?.[1] || null,
+                },
+              });
+            }
+
             if (trimmed.includes("Starting Gemini AI risk assessment")) {
               const modelMatch = trimmed.match(/model=(\S+)/);
               send("step", {
@@ -476,6 +502,45 @@ export async function POST(req: NextRequest) {
                 status: "complete",
                 label: "Encode Workflow Report",
                 detail: `CRE simulator report write complete (${IS_LOCAL ? "local" : "testnet"} mode)`,
+              });
+            }
+
+            if (trimmed.includes("Sending confidential audit webhook to")) {
+              const sinkMatch = trimmed.match(/to (\S+)$/);
+              send("step", {
+                id: "audit-sink",
+                status: "running",
+                label: "Confidential Audit Sink",
+                detail: `Delivering audit event to ${sinkMatch?.[1] || "configured sink"}...`,
+                data: {
+                  auditWebhookUrl: sinkMatch?.[1] || null,
+                },
+              });
+            }
+
+            if (trimmed.includes("Audit webhook delivered via confidential HTTP")) {
+              const sinkMatch = trimmed.match(/to (\S+)$/);
+              send("step", {
+                id: "audit-sink",
+                status: "complete",
+                label: "Confidential Audit Sink",
+                detail: "Audit event delivered",
+                data: {
+                  auditWebhookUrl: sinkMatch?.[1] || null,
+                  delivered: true,
+                },
+              });
+            }
+
+            if (trimmed.includes("Audit webhook delivery failed")) {
+              send("step", {
+                id: "audit-sink",
+                status: "error",
+                label: "Confidential Audit Sink",
+                detail: trimmed,
+                data: {
+                  delivered: false,
+                },
               });
             }
 
@@ -604,6 +669,21 @@ export async function POST(req: NextRequest) {
                 x402TxUrl: `https://sepolia.basescan.org/tx/${finalX402TxHash}`,
                 x402Scheme: "exact",
                 x402Protocol: "EIP-3009 (transferWithAuthorization)",
+              },
+            });
+          }
+          if (
+            typeof simResult.redactionHash === "string" &&
+            /^0x[0-9a-fA-F]{64}$/.test(simResult.redactionHash)
+          ) {
+            send("step", {
+              id: "pii-redact",
+              status: "complete",
+              label: "PII Redaction (Confidential HTTP)",
+              detail: `Completed · redaction hash recorded`,
+              data: {
+                redactionHash: simResult.redactionHash,
+                containsPii: Boolean(simResult.containsPii),
               },
             });
           }

@@ -1306,6 +1306,7 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 		kyb,
 	}
 
+	runtime.log(`Starting PII redaction via ${getPiiRedactorUrl(runtime.config)}`)
 	const redaction = new ConfidentialHTTPClient()
 		.sendRequest(
 			runtime,
@@ -1391,6 +1392,7 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 	const tx = writeDecision(runtime, reportHex)
 
 	if (auditWebhookEnabled) {
+		runtime.log(`Sending confidential audit webhook to ${getAuditWebhookUrl(runtime.config)}`)
 		const auditPayload = {
 			event: 'deepseal.diligence.completed',
 			environment: env,

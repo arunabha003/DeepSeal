@@ -36,9 +36,11 @@ const PIPELINE: { id: string; label: string }[] = [
   { id: "read-request", label: "Read On-Chain Request" },
   { id: "doc-resolve", label: "Resolve & Verify Document Bundle" },
   { id: "kyb", label: "Run KYB Verification (Sumsub + x402)" },
+  { id: "pii-redact", label: "PII Redaction (Confidential HTTP)" },
   { id: "gemini", label: "Run AI Risk Scoring (Gemini)" },
   { id: "decision", label: "Merge Final Decision" },
   { id: "write-report", label: "Encode Workflow Report" },
+  { id: "audit-sink", label: "Confidential Audit Sink" },
   { id: "onchain-write", label: "Broadcast On-Chain (onReport)" },
   { id: "side-effects", label: "On-Chain Side Effects" },
 ];
