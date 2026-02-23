@@ -43,15 +43,20 @@ Then pick one local config file:
 - `config.staging.json` / `config.production.json` → Base Sepolia paid KYB path (`/kyb`), `x402Enabled=true`
 
 Then edit the selected file:
+- `environment` (`local` | `staging` | `production`)
 - `diligencePortalAddress` (deployed `DiligencePortal`)
 - `receiverAddress` (deployed `RWAComplianceReceiver`)
 - `kybUrl` (local provider route)
 - `documentResolverUrl` (local resolver route, usually `http://127.0.0.1:3001/docs/resolve`)
+- `piiRedactorUrl` (PII redaction endpoint, usually `http://127.0.0.1:3001/pii/redact`)
+- `auditWebhookUrl` (private audit sink/webhook, usually `http://127.0.0.1:3001/audit/webhook`)
 - Optional:
   - `useConfidentialHttp` (explicit Confidential HTTP client)
+  - `enforceSensitiveConfidential` (default true outside local mode; blocks non-confidential sensitive paths)
   - `x402Enabled` (should match whether KYB is paywalled on `POST /kyb`)
+  - `auditWebhookEnabled` / `auditWebhookRequired`
   - `geminiApiKey` / `x402BuyerPrivateKey` (local simulation fallback when CRE secrets are not linked)
-  - `docResolverApiKey` (optional shared key for resolver endpoint)
+  - `docResolverApiKey`, `piiRedactorApiKey`, `auditWebhookApiKey` (optional shared keys for provider endpoints)
 
 The real config files are gitignored and intended to be per-user/per-environment.
 
@@ -61,6 +66,8 @@ The real config files are gitignored and intended to be per-user/per-environment
   - document resolver (`/docs/resolve`)
   - KYB provider (`/kyb`)
   - Gemini risk scoring (`generativelanguage.googleapis.com`)
+- PII redaction runs through Confidential HTTP (`/pii/redact`) before Gemini prompt construction.
+- Audit delivery runs through Confidential HTTP (`/audit/webhook`) with enriched workflow outcome payload.
 - For paid mode, set:
   - workflow `kybUrl` to `/kyb`
   - `x402Enabled=true`

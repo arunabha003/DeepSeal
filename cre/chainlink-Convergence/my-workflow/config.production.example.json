@@ -1,4 +1,5 @@
 {
+  "environment": "production",
   "chainSelectorName": "ethereum-testnet-sepolia-base-1",
   "diligencePortalAddress": "0xa5A29714cb9c51A10a165cBe2025372640abb9e5",
   "receiverAddress": "0x16b1D017F22F2aB47bA3eA1948ff973A024CCB4F",
@@ -10,5 +11,12 @@
   "x402BuyerPrivateKey": "",
   "useConfidentialHttp": true,
   "x402Enabled": true,
-  "docResolverApiKey": ""
+  "docResolverApiKey": "",
+  "piiRedactorUrl": "https://YOUR_PUBLIC_KYB_SERVICE/pii/redact",
+  "piiRedactorApiKey": "",
+  "auditWebhookUrl": "https://YOUR_PUBLIC_KYB_SERVICE/audit/webhook",
+  "auditWebhookApiKey": "",
+  "auditWebhookEnabled": true,
+  "auditWebhookRequired": true,
+  "enforceSensitiveConfidential": true
 }
