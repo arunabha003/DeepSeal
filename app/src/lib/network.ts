@@ -27,3 +27,15 @@ export const BLOCK_EXPLORER = "https://sepolia.basescan.org";
 
 export const ERC8004_EXPLORER = "https://testnet.8004scan.io";
 export const ERC8004_CHAIN_SLUG = "base-sepolia";
+
+const parseBoolEnv = (value: string | undefined): boolean | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
+};
+
+// UI badge/control hint only. Workflow behavior is configured in CRE config files.
+export const CONFIDENTIAL_HTTP_ENABLED =
+  parseBoolEnv(process.env.NEXT_PUBLIC_CONFIDENTIAL_HTTP) ?? IS_TESTNET;

@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useReadContract } from "wagmi";
 import { ADDRESSES } from "@/lib/addresses";
+import { CONFIDENTIAL_HTTP_ENABLED } from "@/lib/network";
 import { DiligencePortalABI, RWAAssetRegistryABI } from "@/lib/abis";
 import { Card, CardTitle, Button, AddressLink } from "@/components/ui";
 import { WorkflowMonitor } from "@/components/workflow-monitor";
@@ -105,6 +106,17 @@ function ProcessContent() {
         <p className="text-sm text-muted mt-1">
           Run the CRE workflow to process a diligence request — watch every step live
         </p>
+        <div className="mt-2 flex items-center gap-2">
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${
+              CONFIDENTIAL_HTTP_ENABLED
+                ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                : "bg-zinc-500/15 text-zinc-300 border border-zinc-500/30"
+            }`}
+          >
+            Privacy Mode: {CONFIDENTIAL_HTTP_ENABLED ? "ON (Confidential HTTP)" : "OFF"}
+          </span>
+        </div>
       </div>
 
       {/* ── Select request ────────────────────────────────── */}
