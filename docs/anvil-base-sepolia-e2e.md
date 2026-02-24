@@ -146,6 +146,8 @@ node tools/sync-local-secrets-to-config.mjs --config cre/chainlink-Convergence/m
 cd app && node scripts/sync-abis.mjs
 ```
 
+This updates frontend contract maps, including `RWAAssetRegistry` + `RWAVaultFactory`, so the Vault page can resolve per-asset vaults by `requestId`/`assetId`.
+
 ## 6) Submit diligence request
 ```bash
 
@@ -224,6 +226,19 @@ Expected in local simulate:
 > Gemini runs over standard HTTPS after redaction to stay within CRE's 5-call ConfidentialHTTP limit.
 > If Gemini keeps rejecting demo data, set `demoForceApproveOnKyb=true` in `config.anvil-e2e.json` (demo-only override).
 
+## 9.5) Optional: run through frontend with real on-chain broadcast
+
+`cre workflow simulate` alone will not return a real receiver tx hash in local mode.  
+If you want a real tx for demo, use the frontend process route:
+
+```bash
+cd app
+npm run dev
+```
+
+Open `http://localhost:3000/process`, run the workflow, and let it execute the **Broadcast On-Chain (onReport)** step.  
+That path sends a real transaction to `RWAComplianceReceiver.onReport(...)` and returns a real tx hash (or revert reason).
+
 ## 10) Verify on-chain outcome
 ```bash
 REGISTRY=0xC36E784E1dff616bDae4EAc7B310F0934FaF04a4
@@ -231,6 +246,11 @@ SUBJECT=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 
 cast call $REGISTRY "isApproved(address)(bool)" $SUBJECT --rpc-url http://127.0.0.1:8545
 cast call $REGISTRY "getRecord(address)((bool,uint32,bytes32,uint64))" $SUBJECT --rpc-url http://127.0.0.1:8545
+
+ASSET_REGISTRY=$(jq -r '[.transactions[] | select(.contractName=="RWAAssetRegistry")][0].contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
+FACTORY=$(jq -r '[.transactions[] | select(.contractName=="RWAVaultFactory")][0].contractAddress' broadcast/Deploy.s.sol/84532/run-latest.json)
+ASSET_ID=$(cast call "$ASSET_REGISTRY" "getAssetIdByRequest(uint256)(bytes32)" 1 --rpc-url http://127.0.0.1:8545)
+cast call "$FACTORY" "vaultByAssetId(bytes32)(address)" "$ASSET_ID" --rpc-url http://127.0.0.1:8545
 ```
 
 ## 11) Force Sumsub sandbox outcome (for approve-path demo)

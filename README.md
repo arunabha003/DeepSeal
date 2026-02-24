@@ -43,6 +43,7 @@ One CRE workflow execution reads an on-chain request, resolves an IPFS document 
 - Full implementation: [`docs/implementation.md`](docs/implementation.md)
 - Base Sepolia deployment guide: [`docs/base-sepolia-deployment.md`](docs/base-sepolia-deployment.md)
 - Anvil + Base Sepolia fork E2E guide: [`docs/anvil-base-sepolia-e2e.md`](docs/anvil-base-sepolia-e2e.md)
+- Presentation page: [`docs/presentation 2.html`](docs/presentation%202.html)
 - Protocol architecture diagram: [`docs/protocol-diagram.png`](docs/protocol-diagram.png)
 - Pitch deck slides: [`docs/Deck/`](docs/Deck/)
 - Sample company bundle payload: [`docs/acme-company-bundle.upload.json`](docs/acme-company-bundle.upload.json)
@@ -62,7 +63,7 @@ One CRE workflow execution reads an on-chain request, resolves an IPFS document 
 | Attestation | **EAS** | Stores immutable on-chain compliance proof for each finalized decision. |
 | Agent Trust | **ERC-8004** | Tracks agent identity + reputation + validation artifacts (Agents `#916`, `#917`). |
 | Storage | **IPFS / Pinata** | Stores diligence bundles referenced by `metadataUri`; CRE verifies deterministic hashes. |
-| Vault | **ERC-4626 RWAVault** | Enforces compliance-gated deposits using `ComplianceRegistry.isApproved()`. |
+| Vault | **RWAAssetRegistry + RWAVaultFactory + ERC-4626** | Tracks request-scoped assets and auto-creates per-asset compliance-gated vaults. |
 | UI | **Next.js Frontend** | Real-time SSE pipeline monitoring + request, process, vault, compliance, and agent views. |
 
 ---
@@ -76,6 +77,8 @@ One CRE workflow execution reads an on-chain request, resolves an IPFS document 
 | DiligencePortal | [`0xe6257bd26941cB6C3B977Fe2b2859aE7180396a4`](https://sepolia.basescan.org/address/0xe6257bd26941cB6C3B977Fe2b2859aE7180396a4) |
 | RWAComplianceReceiver | [`0x48935538CEbdb57b7B75D2476DC6C9b3A1cceDD6`](https://sepolia.basescan.org/address/0x48935538CEbdb57b7B75D2476DC6C9b3A1cceDD6) |
 | RWAVault | [`0x15FfbD328C9A0280027E04503A3F15b6bdea91e5`](https://sepolia.basescan.org/address/0x15FfbD328C9A0280027E04503A3F15b6bdea91e5) |
+| RWAAssetRegistry | [`0xBd622016b404f668e63a31BB2b5ADe4aCf4ee2df`](https://sepolia.basescan.org/address/0xBd622016b404f668e63a31BB2b5ADe4aCf4ee2df) |
+| RWAVaultFactory | [`0x9827E6289EC4309cdb3A7326bF4F1816e8B09B28`](https://sepolia.basescan.org/address/0x9827E6289EC4309cdb3A7326bF4F1816e8B09B28) |
 | ValidationRegistry | [`0x7Ee89Ce38ece271262409210f2223205E3D76949`](https://sepolia.basescan.org/address/0x7Ee89Ce38ece271262409210f2223205E3D76949) |
 | IdentityRegistry *(official ERC-8004)* | [`0x8004A818BFB912233c491871b3d84c89A494BD9e`](https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) |
 | ReputationRegistry *(official ERC-8004)* | [`0x8004B663056A597Dffe9eCcC1965A193B7388713`](https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713) |
@@ -97,9 +100,11 @@ One CRE workflow execution reads an on-chain request, resolves an IPFS document 
 | [`cre/chainlink-Convergence/project.yaml`](cre/chainlink-Convergence/project.yaml) | CRE project targets and RPC profiles. |
 | [`cre/chainlink-Convergence/secrets.yaml`](cre/chainlink-Convergence/secrets.yaml) | CRE secret map template. |
 | [`cre/README.md`](cre/README.md) | CRE-specific runbook and commands. |
-| [`src/RWAComplianceReceiver.sol`](src/RWAComplianceReceiver.sol) | On-chain receiver for CRE reports; applies compliance/EAS/ERC-8004 effects. |
+| [`src/RWAComplianceReceiver.sol`](src/RWAComplianceReceiver.sol) | On-chain receiver for CRE reports; applies compliance/EAS/ERC-8004 and per-asset vault effects. |
+| [`src/RWAAssetRegistry.sol`](src/RWAAssetRegistry.sol) | Request-scoped asset records keyed by `assetId`, including compliance decision snapshots. |
+| [`src/RWAVaultFactory.sol`](src/RWAVaultFactory.sol) | Creates and resolves per-asset ERC-4626 vaults used by the Vault page. |
 | [`services/kyb-provider/src/server.mjs`](services/kyb-provider/src/server.mjs) | Provider service (Sumsub + x402 + `/docs/resolve` + `/pii/redact` + `/audit/webhook`). |
-| [`app/src/app/api/workflow/run/route.ts`](app/src/app/api/workflow/run/route.ts) | SSE endpoint that runs CRE simulation and streams pipeline status. |
+| [`app/src/app/api/workflow/run/route.ts`](app/src/app/api/workflow/run/route.ts) | SSE endpoint that runs CRE simulation, then broadcasts `onReport` on-chain and streams pipeline status. |
 
 ---
 

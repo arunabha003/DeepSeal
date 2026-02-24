@@ -13,6 +13,8 @@ This flow runs the full protocol on **real Base Sepolia** using CRE staging simu
 | DiligencePortal | `0xe6257bd26941cB6C3B977Fe2b2859aE7180396a4` | [View](https://sepolia.basescan.org/address/0xe6257bd26941cB6C3B977Fe2b2859aE7180396a4) |
 | RWAComplianceReceiver | `0x48935538CEbdb57b7B75D2476DC6C9b3A1cceDD6` | [View](https://sepolia.basescan.org/address/0x48935538CEbdb57b7B75D2476DC6C9b3A1cceDD6) |
 | RWAVault | `0x15FfbD328C9A0280027E04503A3F15b6bdea91e5` | [View](https://sepolia.basescan.org/address/0x15FfbD328C9A0280027E04503A3F15b6bdea91e5) |
+| RWAAssetRegistry | `0xBd622016b404f668e63a31BB2b5ADe4aCf4ee2df` | [View](https://sepolia.basescan.org/address/0xBd622016b404f668e63a31BB2b5ADe4aCf4ee2df) |
+| RWAVaultFactory | `0x9827E6289EC4309cdb3A7326bF4F1816e8B09B28` | [View](https://sepolia.basescan.org/address/0x9827E6289EC4309cdb3A7326bF4F1816e8B09B28) |
 | IdentityRegistry | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | [View](https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) |
 | ReputationRegistry | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | [View](https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713) |
 | ValidationRegistry | `0x7Ee89Ce38ece271262409210f2223205E3D76949` | [View](https://sepolia.basescan.org/address/0x7Ee89Ce38ece271262409210f2223205E3D76949) |
@@ -23,12 +25,12 @@ This flow runs the full protocol on **real Base Sepolia** using CRE staging simu
 
 | Agent | ID | Name | 8004scan |
 |---|---|---|---|
-| Reputation Agent | `#916` | RWA Diligence Reputation Agent | [View](https://8004scan.vercel.app) |
-| Validation Agent | `#917` | RWA Diligence Validation Agent | [View](https://8004scan.vercel.app) |
+| Reputation Agent | `#916` | RWA Diligence Reputation Agent | [View](https://testnet.8004scan.io/agents/base-sepolia/916) |
+| Validation Agent | `#917` | RWA Diligence Validation Agent | [View](https://testnet.8004scan.io/agents/base-sepolia/917) |
 
 **EAS Schema UID:** `0x91f39675fa85b9340ba36983e388a4b9238c55ac7f593f2c87ba0c55115dd06a`
 
-> Browse all agents: https://8004scan.vercel.app
+> Browse all agents: https://testnet.8004scan.io/agents/base-sepolia
 
 ---
 
@@ -213,6 +215,8 @@ Expected output includes:
 > Note: Gemini is intentionally called via regular HTTPS after PII redaction to stay under CRE's current 5-call ConfidentialHTTP limit.
 > For hackathon demos only, you can set `demoForceApproveOnKyb=true` in `config.staging.json` to force final approval when KYB is `APPROVED`.
 
+If you need a real receiver transaction hash for demo output, run via frontend `/process` (step 8), which executes **Broadcast On-Chain (onReport)** after simulation.
+
 ## 7) Verify on-chain outcome
 
 ```bash
@@ -237,8 +241,12 @@ Key pages:
 - **Agents** (`/agents`) — ERC-8004 agents with 8004scan links
 - **Submit** (`/submit`) — submit diligence requests
 - **Compliance** (`/compliance`) — lookup compliance records
-- **Vault** (`/vault`) — deposit/withdraw from RWA vault
-- **Process** (`/process`) — run CRE workflow with live pipeline visualization
+- **Vault** (`/vault`) — select by `requestId`/`assetId`, then deposit/withdraw in the corresponding per-asset vault
+- **Process** (`/process`) — run CRE workflow with live pipeline visualization and broadcast `onReport` transaction
+
+`/process` returns either:
+- a real Base Sepolia tx hash for `RWAComplianceReceiver.onReport`, or
+- a revert reason surfaced in the workflow timeline.
 
 ## 9) Check ERC-8004 agents on 8004scan
 
@@ -253,10 +261,12 @@ Key pages:
 | What | Link |
 |---|---|
 | ComplianceRegistry | https://sepolia.basescan.org/address/0xa47749699925e9187906f5A0361D5073397279b3 |
+| RWAAssetRegistry | https://sepolia.basescan.org/address/0xBd622016b404f668e63a31BB2b5ADe4aCf4ee2df |
+| RWAVaultFactory | https://sepolia.basescan.org/address/0x9827E6289EC4309cdb3A7326bF4F1816e8B09B28 |
 | IdentityRegistry (official) | https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e |
 | ReputationRegistry (official) | https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713 |
 | ValidationRegistry | https://sepolia.basescan.org/address/0x7Ee89Ce38ece271262409210f2223205E3D76949 |
-| 8004scan | https://8004scan.vercel.app |
+| 8004scan | https://testnet.8004scan.io/agents/base-sepolia |
 
 ---
 

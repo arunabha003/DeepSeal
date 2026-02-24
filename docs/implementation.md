@@ -13,7 +13,9 @@ This document is organized in two parts:
 | Contract | File | Status | Description |
 |----------|------|--------|-------------|
 | **ComplianceRegistry** | `src/ComplianceRegistry.sol` | Complete | Per-address compliance state: `approved`, `riskScore`, `attestationHash`, `updatedAt`. Writable by `owner` or `workflowOperator`. |
-| **RWAVault** | `src/RWAVault.sol` | Complete | ERC-4626 vault that enforces compliance on both `msg.sender` and `receiver` at deposit/mint time. |
+| **RWAAssetRegistry** | `src/RWAAssetRegistry.sol` | Complete | Request-scoped asset records keyed by `assetId`; stores source request metadata, decision fields, and linked vault. |
+| **RWAVaultFactory** | `src/RWAVaultFactory.sol` | Complete | Deterministically creates and maps per-asset ERC-4626 vaults (`assetId -> vault`). |
+| **RWAVault** | `src/RWAVault.sol` | Complete | ERC-4626 vault implementation with compliance checks on both `msg.sender` and `receiver`. |
 | **DiligencePortal** | `src/DiligencePortal.sol` | Complete | Stores diligence requests (`subject`, `docBundleHash`, `metadataUri`) and emits `DiligenceRequested`. |
 | **RWAComplianceReceiver** | `src/RWAComplianceReceiver.sol` | Complete | CRE report receiver. Validates report metadata, updates compliance, and triggers EAS + ERC-8004 side effects. |
 | **DemoUSD** | `src/DemoUSD.sol` | Complete | ERC-20 (6 decimals) test asset used by `RWAVault`. |
@@ -25,7 +27,7 @@ This document is organized in two parts:
 
 | Component | File | Status | Description |
 |-----------|------|--------|-------------|
-| **Workflow (main)** | `cre/chainlink-Convergence/my-workflow/main.ts` | Complete (1081 lines) | Full CRE pipeline: HTTP trigger → on-chain read → doc resolution → KYB/x402 → Gemini → on-chain report write. |
+| **Workflow (main)** | `cre/chainlink-Convergence/my-workflow/main.ts` | Complete | Full CRE pipeline: HTTP trigger → on-chain read → doc resolution → KYB/x402 → PII redaction → Gemini → on-chain report write + confidential audit webhook. |
 | **Config (Anvil)** | `cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json` | Complete | Local Anvil Base Sepolia fork config. |
 | **Config (Staging)** | `cre/chainlink-Convergence/my-workflow/config.staging.json` | Complete | Base Sepolia staging config. |
 | **Config (Production)** | `cre/chainlink-Convergence/my-workflow/config.production.json` | Complete | Production target config. |
@@ -68,9 +70,9 @@ This document is organized in two parts:
 | **Submit Request** | `app/src/app/submit/page.tsx` | Complete | Submits diligence request on-chain to `DiligencePortal`. |
 | **Process Workflow** | `app/src/app/process/page.tsx` | Complete | Runs workflow and shows live execution feed/status. |
 | **Compliance** | `app/src/app/compliance/page.tsx` | Complete | Address-level compliance lookup from registry. |
-| **Vault** | `app/src/app/vault/page.tsx` | Complete | Mint/approve/deposit/withdraw DemoUSD and shares. |
+| **Vault** | `app/src/app/vault/page.tsx` | Complete | Per-asset vault UX (select by `requestId`/`assetId`) with mint/approve/deposit/withdraw, share preview, and on-chain vault read guards. |
 | **Agents** | `app/src/app/agents/page.tsx` | Complete | ERC-8004 agent/reputation/validation views. |
-| **Workflow API Route** | `app/src/app/api/workflow/run/route.ts` | Complete | Spawns CRE command, streams logs, then executes receiver write path. |
+| **Workflow API Route** | `app/src/app/api/workflow/run/route.ts` | Complete | Spawns CRE simulation, streams logs, then broadcasts `RWAComplianceReceiver.onReport` and streams final tx status. |
 | **Workflow Monitor** | `app/src/components/workflow-monitor.tsx` | Complete | Stepwise UI for pipeline state and logs. |
 | **Web3 Config/ABIs** | `app/src/lib/addresses.ts`, `app/src/lib/abis.ts` | Complete | Contract addresses and ABIs used by wagmi/viem. |
 
@@ -95,7 +97,9 @@ This document is organized in two parts:
 |------|------|--------|----------------|
 | ComplianceRegistry | `test/ComplianceRegistry.t.sol` | Passing | Access control + record updates |
 | DiligencePortal | `test/DiligencePortal.t.sol` | Passing | Submit/get/event behavior |
+| RWAAssetRegistry | `test/RWAAssetRegistry.t.sol` | Passing | Asset upsert + decision + vault mapping |
 | RWAVault | `test/RWAVault.t.sol` | Passing | Compliance gating on vault entry |
+| RWAVaultFactory | `test/RWAVaultFactory.t.sol` | Passing | Per-asset vault creation + operator controls |
 | RWAComplianceReceiver | `test/RWAComplianceReceiver.t.sol` | Passing | Report ingest + checks |
 | RWAComplianceReceiverERC8004 | `test/RWAComplianceReceiverERC8004.t.sol` | Passing | ERC-8004 side effects |
 | IdentityRegistry | `test/erc8004/IdentityRegistry.t.sol` | Passing | Agent identity NFT behavior |
@@ -119,7 +123,7 @@ This document is organized in two parts:
 |----------|------|-------------|
 | Main project readme | `README.md` | End-to-end project setup and usage overview. |
 | Implementation guide | `docs/implementation.md` | File review + deep-dive (this doc). |
-| Visual protocol diagram | `docs/protocol-diagram.html` | Single-file architecture visual for submission/demo. |
+| Visual protocol diagram | `docs/protocol-diagram.png` | Architecture visual for submission/demo. |
 | Anvil e2e runbook | `docs/anvil-base-sepolia-e2e.md` | Local fork execution runbook. |
 | Base Sepolia runbook | `docs/base-sepolia-deployment.md` | Live testnet deployment/runbook. |
 | Sample upload bundle | `docs/acme-company-bundle.upload.json` | Example document bundle payload for IPFS upload. |
@@ -146,9 +150,9 @@ This document is organized in two parts:
 
 This keeps state transitions atomic and easier to verify operationally.
 
-### 2.4 RWAVault (ERC-4626)
+### 2.4 RWA Asset Lifecycle (Registry + Factory + Vault)
 
-`RWAVault` is a standards-based vault over `DemoUSD`. It checks compliance status before allowing mint/deposit. Because it depends on the registry, eligibility policy can evolve at the workflow/registry layer while the vault remains minimal and deterministic.
+`RWAAssetRegistry` stores each diligence request as an `assetId` record and tracks its compliance decision over time. `RWAVaultFactory` maps each `assetId` to an ERC-4626 vault and can auto-create missing vaults when the receiver processes a report. `RWAVault` remains policy-minimal: deposits/mints are allowed only for compliant addresses as resolved from `ComplianceRegistry`.
 
 ### 2.5 Chainlink CRE Workflow
 
@@ -204,14 +208,14 @@ EAS stores a protocol-independent attestation of final compliance decision. This
 
 ### 2.11 Frontend + API Processing Layer
 
-The frontend is not just a form UI; it is also the operator console. Submit, process, compliance, vault, and agents pages are wired to live on-chain/off-chain state. The process route streams workflow logs so operators can inspect failure points quickly.
+The frontend is both user UI and operator console. Submit, process, compliance, vault, and agents pages are wired to live on-chain/off-chain state. The process route streams workflow logs, then broadcasts `onReport` to chain and surfaces tx success/revert status in the same pipeline feed.
 
 ---
 
 
 ## Known Constraints / Workarounds
 
-- Local CRE simulation may show non-final tx hash values in logs; validate state through on-chain reads.
+- Direct CRE CLI simulation may show non-final tx hash values (`simulation-no-txhash`); validate state through on-chain reads or use frontend `/process` broadcast mode for a real tx hash.
 - If CRE linked secrets are unavailable in an org, local config fallback tooling is used.
 - CRE currently caps Confidential HTTP calls at 5 per workflow execution; DeepSeal keeps Gemini on standard HTTPS (post-redaction) to stay within this limit.
 - On Base Sepolia fork mode, EIP-7702 delegated account code may need clearing before x402 USDC signature paths.
