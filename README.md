@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/arunabha003/Chainlink-Convergence"><img src="https://img.shields.io/badge/GitHub-Repository-181717?logo=github" /></a>
+  <a href="https://github.com/arunabha003/DeepSeal"><img src="https://img.shields.io/badge/GitHub-Repository-181717?logo=github" /></a>
   <img src="https://img.shields.io/badge/Chain-Base%20Sepolia-0052FF?logo=coinbase" />
   <img src="https://img.shields.io/badge/Workflow-Chainlink%20CRE-375BD2" />
   <img src="https://img.shields.io/badge/Compliance-EAS%20%2B%20ERC--8004-0EA5E9" />
@@ -25,9 +25,9 @@
 
 ## Overview
 
-DeepSeal is a compliance-gated ERC-4626 vault for Real World Assets, where access is controlled by an automated due-diligence pipeline that orchestrates KYB verification (Sumsub via x402 micropayments), confidential PII redaction, AI risk scoring (Google Gemini), on-chain attestations (EAS), and agent reputation tracking (ERC-8004) — all powered by a single Chainlink CRE workflow.
+DeepSeal is a compliance-gated ERC-4626 vault system for Real World Assets, where access is controlled by an automated due-diligence pipeline that orchestrates KYB verification (Sumsub via x402 micropayments), confidential PII redaction, AI risk scoring (Google Gemini), on-chain attestations (EAS), and agent reputation tracking (ERC-8004) — all powered by a single Chainlink CRE workflow.
 
-One CRE workflow execution reads an on-chain request, resolves an IPFS document bundle, verifies the company via KYB, scores risk with Gemini AI, and writes the result on-chain — triggering a cascade of 9 events across 5 contracts in a single transaction: compliance approval, EAS attestation, and ERC-8004 agent reputation + validation artifacts.
+One CRE workflow execution reads an on-chain request, resolves an IPFS document bundle, verifies the company via KYB, redacts sensitive fields, scores risk with Gemini AI, and writes the result on-chain — triggering a multi-contract transaction that updates compliance state, records an EAS attestation, writes ERC-8004 reputation artifacts, syncs the per-asset registry, and links or creates an asset-specific vault.
 
 ---
 
@@ -43,9 +43,8 @@ One CRE workflow execution reads an on-chain request, resolves an IPFS document 
 - Full implementation: [`docs/implementation.md`](docs/implementation.md)
 - Base Sepolia deployment guide: [`docs/base-sepolia-deployment.md`](docs/base-sepolia-deployment.md)
 - Anvil + Base Sepolia fork E2E guide: [`docs/anvil-base-sepolia-e2e.md`](docs/anvil-base-sepolia-e2e.md)
-- Presentation page: [`docs/presentation 2.html`](docs/presentation%202.html)
+- Pitch deck slides: [`docs/deck/`](docs/deck/)
 - Protocol architecture diagram: [`docs/protocol-diagram.png`](docs/protocol-diagram.png)
-- Pitch deck slides: [`docs/Deck/`](docs/Deck/)
 - Sample company bundle payload: [`docs/acme-company-bundle.upload.json`](docs/acme-company-bundle.upload.json)
 
 ---
@@ -61,7 +60,7 @@ One CRE workflow execution reads an on-chain request, resolves an IPFS document 
 | Risk Engine | **Google Gemini** | Produces structured `{ approved, riskScore, reasons[] }` output from PII-redacted company context over standard HTTPS. |
 | Audit Trail (Offchain) | **Confidential Audit Sink** | Receives private completion payloads (`requestId`, hashes, decision, x402 tx hash) for compliance logging. |
 | Attestation | **EAS** | Stores immutable on-chain compliance proof for each finalized decision. |
-| Agent Trust | **ERC-8004** | Tracks agent identity + reputation + validation artifacts (Agents `#916`, `#917`). |
+| Agent Trust | **ERC-8004** | Tracks agent identity + reputation + validation artifacts for the receiver-linked DeepSeal agents. |
 | Storage | **IPFS / Pinata** | Stores diligence bundles referenced by `metadataUri`; CRE verifies deterministic hashes. |
 | Vault | **RWAAssetRegistry + RWAVaultFactory + ERC-4626** | Tracks request-scoped assets and auto-creates per-asset compliance-gated vaults. |
 | UI | **Next.js Frontend** | Real-time SSE pipeline monitoring + request, process, vault, compliance, and agent views. |
@@ -85,7 +84,7 @@ One CRE workflow execution reads an on-chain request, resolves an IPFS document 
 | EAS Contract *(Base native)* | [`0x4200000000000000000000000000000000000021`](https://sepolia.basescan.org/address/0x4200000000000000000000000000000000000021) |
 | EAS Schema Registry | [`0x4200000000000000000000000000000000000020`](https://sepolia.basescan.org/address/0x4200000000000000000000000000000000000020) |
 
-- ERC-8004 agents: [#916 Reputation](https://testnet.8004scan.io/agents/base-sepolia/916), [#917 Validation](https://testnet.8004scan.io/agents/base-sepolia/917), [Browse all](https://testnet.8004scan.io/agents/base-sepolia)
+- ERC-8004 agents: [#1154 Reputation](https://testnet.8004scan.io/agents/base-sepolia/1154), [#1155 Validation](https://testnet.8004scan.io/agents/base-sepolia/1155), [Browse all](https://testnet.8004scan.io/agents/base-sepolia)
 - EAS schema UID: `0x91f39675fa85b9340ba36983e388a4b9238c55ac7f593f2c87ba0c55115dd06a`
 
 ---
@@ -94,7 +93,7 @@ One CRE workflow execution reads an on-chain request, resolves an IPFS document 
 
 | File | Description |
 |---|---|
-| [`cre/chainlink-Convergence/my-workflow/main.ts`](cre/chainlink-Convergence/my-workflow/main.ts) | Main CRE workflow (trigger → on-chain read → bundle resolve/verify → KYB/x402 → Gemini → on-chain report). |
+| [`cre/chainlink-Convergence/my-workflow/main.ts`](cre/chainlink-Convergence/my-workflow/main.ts) | Main CRE workflow (trigger → on-chain read → bundle resolve/verify → KYB/x402 → PII redaction → Gemini → confidential audit → on-chain report). |
 | [`cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json`](cre/chainlink-Convergence/my-workflow/config.anvil-e2e.json) | Local Anvil fork config. |
 | [`cre/chainlink-Convergence/my-workflow/config.staging.json`](cre/chainlink-Convergence/my-workflow/config.staging.json) | Base Sepolia staging config. |
 | [`cre/chainlink-Convergence/project.yaml`](cre/chainlink-Convergence/project.yaml) | CRE project targets and RPC profiles. |
