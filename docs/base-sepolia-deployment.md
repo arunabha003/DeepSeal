@@ -25,8 +25,8 @@ This flow runs the full protocol on **real Base Sepolia** using CRE staging simu
 
 | Agent | ID | Name | 8004scan |
 |---|---|---|---|
-| Reputation Agent | `#916` | RWA Diligence Reputation Agent | [View](https://testnet.8004scan.io/agents/base-sepolia/916) |
-| Validation Agent | `#917` | RWA Diligence Validation Agent | [View](https://testnet.8004scan.io/agents/base-sepolia/917) |
+| Reputation Agent | `#1154` | RWA Diligence Reputation Agent | [View](https://testnet.8004scan.io/agents/base-sepolia/1154) |
+| Validation Agent | `#1155` | RWA Diligence Validation Agent | [View](https://testnet.8004scan.io/agents/base-sepolia/1155) |
 
 **EAS Schema UID:** `0x91f39675fa85b9340ba36983e388a4b9238c55ac7f593f2c87ba0c55115dd06a`
 
@@ -250,9 +250,9 @@ Key pages:
 
 ## 9) Check ERC-8004 agents on 8004scan
 
-- All agents: https://8004scan.vercel.app
-- Agent #916 (Reputation): https://8004scan.vercel.app
-- Agent #917 (Validation): https://8004scan.vercel.app
+- All agents: https://testnet.8004scan.io/agents/base-sepolia
+- Agent #1154 (Reputation): https://testnet.8004scan.io/agents/base-sepolia/1154
+- Agent #1155 (Validation): https://testnet.8004scan.io/agents/base-sepolia/1155
 
 ---
 

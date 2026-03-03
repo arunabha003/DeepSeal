@@ -36,12 +36,14 @@ This document is organized in two parts:
 | **Workflow docs** | `cre/chainlink-Convergence/my-workflow/README.md` | Complete | Workflow-specific setup and run notes. |
 
 ### CRE Workflow Features (Implemented)
-- HTTP trigger with `requestId` + optional `companyInfo`
+- HTTP trigger with `requestId` only
 - On-chain request read from `DiligencePortal`
 - Metadata document resolution + deterministic extraction hashes
 - x402 buyer flow (402 challenge → sign payment → retry)
 - Sumsub-backed KYB through provider endpoints
+- Confidential PII redaction before AI scoring
 - Gemini risk scoring with model fallback
+- Confidential audit webhook after workflow completion
 - `runtime.log()` observability for step-by-step tracing
 - On-chain report write path to `RWAComplianceReceiver`
 

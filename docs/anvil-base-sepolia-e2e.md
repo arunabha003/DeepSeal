@@ -257,7 +257,7 @@ cast call "$FACTORY" "vaultByAssetId(bytes32)(address)" "$ASSET_ID" --rpc-url ht
 ```bash
 curl -sS -X POST http://127.0.0.1:3001/kyb/free \
   -H 'content-type: application/json' \
-  -d '{"subject":"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266","docBundleHash":"0x1111111111111111111111111111111111111111111111111111111111111111","metadataUri":"ipfs://rwa-docs/acme","companyInfo":{"companyName":"Acme LLC","country":"USA"}}' | jq
+  -d '{"subject":"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266","docBundleHash":"0x1111111111111111111111111111111111111111111111111111111111111111","metadataUri":"ipfs://rwa-docs/acme"}' | jq
 ```
 Copy `sumsub.applicantId`, then:
 ```bash
