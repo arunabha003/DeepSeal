@@ -889,7 +889,6 @@ const fetchGeminiRisk = (
 
 	if (response.statusCode < 200 || response.statusCode >= 300) {
 		let errorBody = decodeBodyUtf8(response.body)
-		// Model names evolve quickly. If configured model is invalid, discover an available one and retry once.
 		if (response.statusCode === 404) {
 			const modelsResp = sendRequester
 				.sendRequest({
@@ -1343,10 +1342,6 @@ const onHttpTrigger = async (runtime: Runtime<Config>, payload: any): Promise<st
 
 	const apiKey = getRequiredSecret(runtime, 'GEMINI_API_KEY')
 
-	// Gemini uses regular HTTP even in confidential mode:
-	// - prompt data is already PII-redacted
-	// - Gemini is a public API over HTTPS
-	// - saves a ConfidentialHTTP slot (CRE limit = 5 per workflow)
 	const geminiRisk = new HTTPClient()
 		.sendRequest(
 			runtime,
